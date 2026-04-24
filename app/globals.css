@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top, rgba(213, 241, 219, 0.95), transparent 34%),
+    linear-gradient(180deg, #eef7ee 0%, #e1efe3 100%);
+  color: #17311d;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+@keyframes gentle-pop {
+  0% {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-ring {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+.animate-gentle-pop {
+  animation: gentle-pop 180ms ease-out;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 650ms infinite alternate;
+}

@@ -1,0 +1,1913 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>🐦 Adiviná el Ave</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f5f0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.screen{display:none;width:100%;max-width:640px;padding:18px}
+.screen.active{display:block}
+
+/* ── Music FAB ── */
+#music-fab{position:fixed;top:14px;right:14px;z-index:999;background:white;border:2px solid #b0d0b0;border-radius:50%;width:42px;height:42px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.12);transition:background .15s,border-color .15s}
+#music-fab:hover{background:#eaf5ea;border-color:#3a8a3a}
+
+/* ── Toast ── */
+#toast{position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-20px);background:#1a3d1a;color:white;padding:12px 22px;border-radius:14px;font-size:15px;font-weight:bold;z-index:9999;opacity:0;pointer-events:none;transition:opacity .35s,transform .35s;white-space:normal;text-align:center;max-width:90vw;box-shadow:0 4px 18px rgba(0,0,0,.25)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ══ MENU ══ */
+#menu-screen{background:white;border-radius:20px;box-shadow:0 4px 28px rgba(0,0,0,.1);padding:28px 20px 22px;text-align:center}
+#menu-screen h1{font-size:24px;color:#2d5a27;margin-bottom:3px}
+#menu-screen .tagline{font-size:12px;color:#999;margin-bottom:10px}
+
+.overall-progress-wrap{background:#f0f5f0;border-radius:12px;padding:10px 14px;margin-bottom:14px;text-align:left;cursor:pointer;transition:background .15s}
+.overall-progress-wrap:hover{background:#e6f0e6}
+.overall-progress-label{font-size:12px;font-weight:bold;color:#555;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.overall-progress-label .pct{color:#222}.pct.orange{color:#e65100}.pct.green{color:#2d7a2d}
+.rank-title{font-size:11px;color:#888;font-style:italic}
+.bar-outer{background:#ddd;border-radius:99px;height:8px;overflow:hidden}
+.bar-inner{height:100%;border-radius:99px;transition:width .5s;background:#888}
+.bar-inner.orange{background:#f4511e}.bar-inner.green{background:#3a8a3a}
+.overall-click-hint{font-size:10px;color:#bbb;text-align:right;margin-top:3px}
+
+.mode-groups{display:flex;flex-direction:column;gap:8px}
+.mode-group{border:2px solid #b0d0b0;border-radius:16px;background:#f5fbf5;overflow:visible}
+.mode-group.locked{border-color:#ccc;background:#f5f5f5;opacity:.75}
+.mode-group-header{display:flex;align-items:center;gap:8px;padding:9px 14px 7px;border-bottom:1px solid #d8eed8}
+.mode-group.locked .mode-group-header{border-bottom-color:#e0e0e0}
+.mode-group-icon{font-size:19px;flex-shrink:0}
+.mode-group-title{font-size:13px;font-weight:bold;color:#2d5a27;flex:1}
+.mode-group.locked .mode-group-title{color:#999}
+.group-prog{font-size:11px;font-weight:bold;color:#555}
+.group-prog .gp-pct{color:#333}.gp-pct.orange{color:#e65100}.gp-pct.green{color:#2d7a2d}
+
+.mode-group-btns{display:grid;grid-template-columns:1fr 1fr}
+.sub-btn{padding:9px 6px;font-size:12px;font-weight:500;color:#444;background:transparent;border:none;cursor:pointer;transition:background .13s,color .13s;text-align:center;border-right:1px solid #d8eed8;position:relative}
+.sub-btn:last-child{border-right:none}
+.sub-btn:hover:not(.sub-locked){background:#eaf5ea;color:#2d5a27}
+.sub-btn.sub-locked{cursor:default;color:#bbb;background:#f0f0f0}
+.sub-btn-icon{font-size:14px;display:block;margin-bottom:1px}
+.sub-btn-label{font-size:10px;color:#999;display:block}
+.sub-btn.sub-locked .sub-btn-label{color:#ccc}
+.sub-progress{font-size:10px;font-weight:bold;display:block;margin-top:2px}
+.sub-progress.locked-text{color:#bbb}.sub-progress.p-low{color:#555}.sub-progress.p-mid{color:#e65100}.sub-progress.p-high{color:#2d7a2d}
+
+.lock-tooltip{display:none;position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:#333;color:white;font-size:10px;padding:5px 9px;border-radius:7px;white-space:nowrap;z-index:200;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.lock-tooltip::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:#333}
+.sub-btn.sub-locked:hover .lock-tooltip{display:block}
+
+.mode-card-solo{border:2px solid #b0d0b0;border-radius:16px;padding:12px 15px;cursor:pointer;text-align:left;background:#f5fbf5;transition:border-color .15s,background .15s,transform .1s;display:flex;align-items:center;gap:12px}
+.mode-card-solo:hover{border-color:#3a8a3a;background:#eaf5ea;transform:translateY(-2px)}
+.mode-card-solo .solo-icon{font-size:20px;flex-shrink:0}
+.mode-card-solo .solo-title{font-size:13px;font-weight:bold;color:#333;margin-bottom:2px}
+.mode-card-solo .solo-desc{font-size:11px;color:#888}
+
+/* Minigames card */
+.mode-card-mini{border:2px solid #d0a0e0;border-radius:16px;padding:12px 15px;cursor:pointer;text-align:left;background:#fdf5ff;transition:border-color .15s,background .15s,transform .1s;display:flex;align-items:center;gap:12px}
+.mode-card-mini:hover{border-color:#9c27b0;background:#f8ecff;transform:translateY(-2px)}
+.mode-card-mini .solo-icon{font-size:20px;flex-shrink:0}
+.mode-card-mini .solo-title{font-size:13px;font-weight:bold;color:#6a1b9a;margin-bottom:2px}
+.mode-card-mini .solo-desc{font-size:11px;color:#888}
+
+.menu-records{margin-top:12px;font-size:11px;color:#bbb;line-height:1.8}
+.menu-records strong{color:#999}
+.author-credit{margin-top:14px;padding-top:12px;border-top:1px solid #eee;font-size:11px;color:#aaa;line-height:1.7}
+.author-credit strong{color:#888;font-size:12px}
+
+/* ══ RECORDS MODAL ══ */
+#records-modal{display:none;position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.45);align-items:center;justify-content:center}
+#records-modal.open{display:flex}
+.records-modal-box{background:white;border-radius:20px;padding:24px 20px;max-width:560px;width:92%;max-height:82vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25);animation:fadeIn .25s ease}
+.records-modal-box h2{font-size:19px;color:#2d5a27;margin-bottom:3px}
+.records-modal-box .rm-subtitle{font-size:12px;color:#aaa;margin-bottom:16px}
+.rm-section-title{font-size:11px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;padding-bottom:3px;border-bottom:1px solid #eee}
+.rm-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:12px}
+.rm-mode{color:#444}.rm-val{font-weight:bold;color:#2d5a27}.rm-val.zero{color:#bbb;font-weight:normal}
+.rm-pct{font-size:11px;margin-left:6px}.rm-pct.orange{color:#e65100}.rm-pct.green{color:#2d7a2d}
+.rm-close{margin-top:18px;width:100%;padding:10px;border:none;border-radius:10px;background:#2d7a2d;color:white;font-size:14px;cursor:pointer}
+.rm-close:hover{background:#1e5c1e}
+
+/* ══ DB SELECTION ══ */
+#db-screen{background:white;border-radius:20px;box-shadow:0 4px 28px rgba(0,0,0,.1);padding:26px 22px}
+#db-screen h2{font-size:19px;color:#2d5a27;margin-bottom:3px}
+#db-screen .db-subtitle{font-size:12px;color:#aaa;margin-bottom:16px}
+.db-cards{display:flex;flex-direction:column;gap:9px}
+.db-card{border:2px solid #b0d0b0;border-radius:14px;padding:13px 17px;cursor:pointer;background:#f5fbf5;transition:border-color .15s,background .15s,transform .1s}
+.db-card:hover:not(.db-locked){border-color:#3a8a3a;background:#eaf5ea;transform:translateY(-2px)}
+.db-card.db-locked{border-color:#ccc;background:#f5f5f5;cursor:default;opacity:.6}
+.db-card-badge{display:inline-block;font-size:11px;font-weight:bold;padding:2px 8px;border-radius:99px;margin-bottom:4px}
+.badge-easy{background:#e6f4ea;color:#2e7d32;border:1px solid #a5d6a7}
+.badge-medium{background:#e3f2fd;color:#1565c0;border:1px solid #90caf9}
+.badge-hard{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
+.badge-expert{background:#fce4ec;color:#880e4f;border:1px solid #f48fb1}
+.badge-lock{background:#f0f0f0;color:#999;border:1px solid #ccc}
+.db-card-title{font-size:14px;font-weight:bold;color:#333;margin-bottom:2px}
+.db-card-desc{font-size:12px;color:#888}
+.db-card-meta{font-size:11px;color:#bbb;margin-top:3px}
+.db-lock-hint{font-size:11px;color:#e65100;margin-top:4px;font-style:italic}
+
+/* ══ GAME ══ */
+#game-screen{text-align:center}
+.back-btn{display:inline-block;font-size:12px;color:#3a8a3a;cursor:pointer;margin-bottom:8px;background:none;border:none;padding:0}
+.back-btn:hover{text-decoration:underline}
+h2.game-title{font-size:16px;color:#333;margin-bottom:10px}
+#stats{display:flex;justify-content:center;gap:24px;font-size:15px;color:#555;margin-bottom:3px}
+#stats .value{font-weight:bold;color:#222;font-size:17px}
+#timer-display{font-size:13px;color:#777;margin-bottom:5px}
+#progress-wrap{background:#ddd;border-radius:99px;height:7px;margin:6px 0 3px;overflow:hidden}
+#progress-bar{height:100%;background:#3a8a3a;border-radius:99px;transition:width .4s}
+#progress-label{font-size:11px;color:#999;margin-bottom:7px}
+
+.sound-btn{flex-shrink:0;width:40px;height:40px;border-radius:50%;border:2px solid #b0d0b0;background:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s,transform .1s}
+.sound-btn:hover{background:#eaf5ea;border-color:#3a8a3a;transform:scale(1.1)}
+.sound-btn.playing{background:#d0ecd0;border-color:#3a8a3a;animation:pulse .6s infinite alternate}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.12)}}
+.sound-btn:disabled{opacity:.35;cursor:default;transform:none!important;animation:none!important}
+
+.image-and-sound{display:flex;align-items:center;gap:10px;margin:7px 0}
+.image-box{flex:1;height:200px;display:flex;align-items:center;justify-content:center;background:white;border:1px solid #ddd;border-radius:10px;overflow:hidden}
+.image-box img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.obra-label{font-size:10px;color:#999;font-style:italic;margin:-2px 0 5px}
+
+#options-imagen{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin:7px 0}
+#options-imagen button{padding:8px 13px;font-size:13px;border:2px solid #aaa;border-radius:8px;background:white;cursor:pointer;transition:background .15s,border-color .15s;max-width:240px}
+#options-imagen button:hover:not(:disabled){background:#eaf5ea;border-color:#3a8a3a}
+#options-imagen button:disabled{cursor:default}
+#options-imagen button.wrong{background:#fdecea;border-color:#e57373;color:#bbb;text-decoration:line-through}
+#options-imagen button.correct{background:#e6f4ea;border-color:#66bb6a;color:#2e7d32;font-weight:bold}
+
+.write-hint{font-size:11px;color:#aaa;margin:5px 0 3px;text-align:left}
+.write-input-wrap{display:flex;gap:7px;margin:3px 0 5px}
+.write-input-wrap input{flex:1;padding:10px 13px;font-size:14px;border:2px solid #b0d0b0;border-radius:10px;outline:none;transition:border-color .15s}
+.write-input-wrap input:focus{border-color:#3a8a3a}
+.write-input-wrap input:disabled{background:#f5f5f5;color:#999}
+.write-submit-btn{padding:10px 16px;font-size:14px;font-weight:bold;background:#3a8a3a;color:white;border:none;border-radius:10px;cursor:pointer;transition:background .15s}
+.write-submit-btn:hover:not(:disabled){background:#2e6e2e}
+.write-submit-btn:disabled{background:#aaa;cursor:default}
+.write-answer-reveal{font-size:12px;color:#555;background:#fffde7;border:1px solid #f9a825;border-radius:8px;padding:7px 12px;margin:2px 0 5px;display:none;text-align:left}
+.write-answer-reveal.visible{display:block}
+.write-answer-reveal strong{color:#2d5a27}
+
+.nombre-header{display:flex;align-items:center;gap:10px;margin:7px 0 4px}
+#nombre-prompt{flex:1;font-size:19px;font-weight:bold;color:#333;background:white;border:2px solid #b0d0b0;border-radius:12px;padding:13px 17px}
+#nombre-obra{font-size:10px;color:#999;font-style:italic;margin-bottom:6px}
+
+#options-nombre{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:7px 0}
+.img-option{border:3px solid #ddd;border-radius:10px;background:white;cursor:pointer;overflow:hidden;height:120px;display:flex;align-items:center;justify-content:center;transition:border-color .15s,transform .1s;padding:0}
+.img-option:hover:not(:disabled){border-color:#3a8a3a;transform:scale(1.02)}
+.img-option:disabled{cursor:default}
+.img-option img{max-width:100%;max-height:100%;object-fit:contain}
+.img-option.wrong{border-color:#e57373;background:#fdecea;opacity:.5}
+.img-option.correct{border-color:#66bb6a;background:#e6f4ea}
+
+#options-nombre-sonido{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:7px 0}
+.snd-option{border:3px solid #ddd;border-radius:10px;background:white;cursor:pointer;padding:14px 7px;display:flex;flex-direction:column;align-items:center;gap:6px;transition:border-color .15s,background .15s,transform .1s}
+.snd-option:hover:not(:disabled){border-color:#3a8a3a;background:#eaf5ea;transform:scale(1.02)}
+.snd-option:disabled{cursor:default}
+.snd-option .snd-play{width:44px;height:44px;border-radius:50%;border:2px solid #b0d0b0;background:#f5fbf5;font-size:19px;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.snd-option .snd-label{font-size:10px;color:#aaa}
+.snd-option.wrong{border-color:#e57373;background:#fdecea;opacity:.6}
+.snd-option.correct{border-color:#66bb6a;background:#e6f4ea}
+.snd-option.correct .snd-play{border-color:#66bb6a;background:#d0f0d0}
+.snd-option.playing-now{border-color:#3a8a3a;background:#eaf5ea}
+.snd-option.playing-now .snd-play{border-color:#3a8a3a;background:#d0ecd0;animation:pulse .6s infinite alternate}
+
+.sonido-player{display:flex;flex-direction:column;align-items:center;gap:11px;background:white;border:2px solid #b0d0b0;border-radius:16px;padding:18px 16px;margin:7px 0 10px}
+.sonido-label{font-size:11px;color:#aaa;letter-spacing:.5px;text-transform:uppercase}
+.play-big-btn{width:64px;height:64px;border-radius:50%;border:3px solid #3a8a3a;background:#eaf5ea;font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s}
+.play-big-btn:hover{background:#d0ecd0;transform:scale(1.08)}
+.play-big-btn.playing{background:#d0ecd0;border-color:#267326;animation:pulse .6s infinite alternate}
+.play-big-btn:disabled{opacity:.35;cursor:default;transform:none!important;animation:none!important}
+.play-hint{font-size:10px;color:#bbb}
+
+.reveal-wrap{display:none;flex-direction:column;align-items:center;gap:5px;margin:0 0 7px}
+.reveal-wrap.visible{display:flex}
+.reveal-img-box{width:100%;height:160px;display:flex;align-items:center;justify-content:center;background:#f8fff8;border:2px solid #66bb6a;border-radius:12px;overflow:hidden;animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.reveal-img-box img{max-width:100%;max-height:100%;object-fit:contain}
+.reveal-obra{font-size:10px;color:#999;font-style:italic}
+
+#options-sonido{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin:7px 0}
+#options-sonido button{padding:8px 13px;font-size:13px;border:2px solid #aaa;border-radius:8px;background:white;cursor:pointer;transition:background .15s,border-color .15s;max-width:240px}
+#options-sonido button:hover:not(:disabled){background:#eaf5ea;border-color:#3a8a3a}
+#options-sonido button:disabled{cursor:default}
+#options-sonido button.wrong{background:#fdecea;border-color:#e57373;color:#bbb;text-decoration:line-through}
+#options-sonido button.correct{background:#e6f4ea;border-color:#66bb6a;color:#2e7d32;font-weight:bold}
+
+#result{font-size:17px;margin-top:5px;min-height:22px}
+
+/* ══ GUIDE ══ */
+#guide-screen{padding:13px 18px 26px}
+.guide-header{display:flex;align-items:center;gap:9px;margin-bottom:10px;flex-wrap:wrap}
+.guide-header h2{font-size:18px;color:#333;flex:1;min-width:100px}
+.guide-filters{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:9px}
+.filter-btn{padding:4px 10px;font-size:11px;border-radius:99px;border:1px solid #b0d0b0;background:#f5fbf5;cursor:pointer;transition:background .13s,border-color .13s}
+.filter-btn.active{background:#2d7a2d;color:white;border-color:#2d7a2d}
+.filter-btn:hover:not(.active){background:#eaf5ea;border-color:#3a8a3a}
+.guide-list{display:flex;flex-direction:column;gap:9px}
+.guide-section-title{font-size:11px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-top:5px;padding-bottom:3px;border-bottom:1px solid #e0e0e0}
+.guide-card{background:white;border:1px solid #c0ddc0;border-radius:11px;padding:9px 11px;display:flex;gap:10px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.guide-img-wrap{width:85px;height:62px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#f5fbf5;border:1px solid #c0ddc0;border-radius:8px;overflow:hidden}
+.guide-img-wrap img{max-width:100%;max-height:100%;object-fit:contain}
+.guide-info{flex:1;text-align:left}
+.guide-name{font-size:13px;font-weight:bold;color:#333;margin-bottom:2px}
+.guide-obra{font-size:10px;color:#999;font-style:italic;margin-bottom:3px}
+.guide-tags{display:flex;flex-wrap:wrap;gap:3px}
+.guide-tag{font-size:10px;padding:1px 6px;border-radius:99px;background:#e6f4ea;color:#2e7d32;border:1px solid #a5d6a7}
+
+/* ══ MINIGAMES MENU ══ */
+#minigames-screen{background:white;border-radius:20px;box-shadow:0 4px 28px rgba(0,0,0,.1);padding:26px 20px;text-align:center}
+#minigames-screen h2{font-size:20px;color:#6a1b9a;margin-bottom:4px}
+#minigames-screen .tagline{font-size:12px;color:#aaa;margin-bottom:20px}
+.mini-cards{display:flex;flex-direction:column;gap:10px}
+.mini-card{border:2px solid #d0a0e0;border-radius:14px;padding:14px 17px;cursor:pointer;text-align:left;background:#fdf5ff;display:flex;align-items:center;gap:13px;transition:border-color .15s,background .15s,transform .1s}
+.mini-card:hover{border-color:#9c27b0;background:#f8ecff;transform:translateY(-2px)}
+.mini-icon{font-size:26px;flex-shrink:0}
+.mini-title{font-size:14px;font-weight:bold;color:#6a1b9a;margin-bottom:2px}
+.mini-desc{font-size:11px;color:#888}
+
+/* ══ MINIGAME: MEMOTEST ══ */
+#memo-screen{text-align:center;padding:14px 12px 24px}
+.memo-grid{display:grid;gap:8px;margin:14px auto;max-width:540px}
+.memo-grid.g-4{grid-template-columns:repeat(4,1fr)}
+.memo-grid.g-6{grid-template-columns:repeat(4,1fr)}
+.memo-card{border:2px solid #b0d0b0;border-radius:12px;background:#f5fbf5;cursor:pointer;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .15s,border-color .15s;overflow:hidden;position:relative}
+.memo-card:hover:not(.flipped):not(.matched){border-color:#3a8a3a;transform:scale(1.04)}
+.memo-card.flipped,.memo-card.matched{background:white}
+.memo-card.matched{border-color:#66bb6a;background:#e6f4ea}
+.memo-card .card-back{font-size:28px;color:#b0d0b0}
+.memo-card .card-front{display:none;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;padding:5px}
+.memo-card.flipped .card-back,.memo-card.matched .card-back{display:none}
+.memo-card.flipped .card-front,.memo-card.matched .card-front{display:flex}
+.memo-card .card-img{width:100%;flex:1;min-height:0;object-fit:contain}
+.memo-card .card-name{font-size:10px;font-weight:bold;color:#333;text-align:center;line-height:1.2;margin-top:3px}
+.memo-card.type-name .card-front{background:#f0f8ff}
+.memo-card.type-name .card-name{font-size:12px;font-weight:bold;color:#1565c0}
+.memo-stats{display:flex;justify-content:center;gap:20px;font-size:14px;color:#555;margin:8px 0}
+.memo-stats .mv{font-weight:bold;color:#2d5a27}
+
+/* ══ MINIGAME: ORDENAR ══ */
+#ordenar-screen{text-align:center;padding:14px 14px 24px}
+.ordenar-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.ordenar-img-cell{border:2px solid #b0d0b0;border-radius:12px;background:white;padding:8px;display:flex;flex-direction:column;align-items:center;gap:6px;min-height:150px}
+.ordenar-img-cell img{width:100%;height:100px;object-fit:contain}
+.ordenar-drop-zone{width:100%;min-height:36px;border:2px dashed #b0d0b0;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#f5fbf5;font-size:12px;color:#aaa;transition:border-color .15s,background .15s}
+.ordenar-drop-zone.drag-over{border-color:#3a8a3a;background:#eaf5ea}
+.ordenar-drop-zone.correct{border-color:#66bb6a;background:#e6f4ea;color:#2e7d32;font-weight:bold;border-style:solid}
+.ordenar-drop-zone.wrong{border-color:#e57373;background:#fdecea;color:#e57373;border-style:solid}
+.ordenar-names{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:10px 0}
+.name-chip{padding:7px 14px;background:white;border:2px solid #3a8a3a;border-radius:99px;font-size:13px;font-weight:500;cursor:grab;user-select:none;transition:background .13s,transform .1s;color:#2d5a27}
+.name-chip:hover{background:#eaf5ea;transform:scale(1.04)}
+.name-chip.dragging{opacity:.5;cursor:grabbing}
+.name-chip.placed{display:none}
+
+/* ══ MINIGAME: IMPOSTOR ══ */
+#impostor-screen{text-align:center;padding:14px 14px 24px}
+.impostor-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:10px 0}
+.impostor-bird-cell{border:2px solid #ddd;border-radius:12px;background:white;padding:8px;display:flex;flex-direction:column;align-items:center;gap:5px}
+.impostor-bird-cell img{width:100%;height:95px;object-fit:contain;border-radius:8px}
+.impostor-bird-cell .ibc-name{font-size:12px;font-weight:bold;color:#333;text-align:center}
+.impostor-names{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:12px 0 6px}
+.impostor-name-btn{padding:8px 16px;background:white;border:2px solid #aaa;border-radius:99px;font-size:13px;cursor:pointer;transition:background .13s,border-color .13s}
+.impostor-name-btn:hover:not(:disabled){background:#fff3e0;border-color:#f57c00}
+.impostor-name-btn:disabled{cursor:default}
+.impostor-name-btn.correct{background:#e6f4ea;border-color:#66bb6a;color:#2e7d32;font-weight:bold}
+.impostor-name-btn.wrong{background:#fdecea;border-color:#e57373;color:#bbb;text-decoration:line-through}
+.impostor-score{font-size:22px;font-weight:bold;color:#2d5a27;margin:8px 0}
+
+/* ══ RESULTS ══ */
+#results-screen{text-align:center;background:white;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.1);padding:28px 24px}
+#results-screen h2{font-size:22px;color:#333;margin-bottom:5px}
+#results-screen .subtitle{color:#888;font-size:12px;margin-bottom:20px}
+.result-cards{display:flex;justify-content:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+.result-card{background:#f5fbf5;border:2px solid #b0d0b0;border-radius:12px;padding:14px 22px;min-width:115px}
+.result-card .card-label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px}
+.result-card .card-value{font-size:28px;font-weight:bold;color:#2d7a2d;margin:3px 0}
+.result-card .card-sub{font-size:10px;color:#aaa}
+.records{display:flex;flex-direction:column;gap:7px;margin-bottom:18px;min-height:7px}
+.badge-record{background:linear-gradient(135deg,#fff9c4,#fff3e0);border:2px solid #f9a825;border-radius:10px;padding:8px 16px;font-size:13px;color:#e65100;font-weight:bold;animation:pop .4s ease}
+@keyframes pop{0%{transform:scale(.8);opacity:0}70%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+.best-scores{font-size:12px;color:#999;margin-bottom:18px}
+.best-scores span{color:#666;font-weight:bold}
+.results-buttons{display:flex;gap:9px;justify-content:center;flex-wrap:wrap}
+.btn-primary{background:#2d7a2d;color:white;border:none;border-radius:10px;padding:11px 22px;font-size:14px;cursor:pointer;transition:background .2s}
+.btn-primary:hover{background:#1e5c1e}
+.btn-secondary{background:white;color:#2d7a2d;border:2px solid #2d7a2d;border-radius:10px;padding:11px 22px;font-size:14px;cursor:pointer;transition:background .2s}
+.btn-secondary:hover{background:#eaf5ea}
+.unlock-notif{background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:2px solid #66bb6a;border-radius:12px;padding:9px 16px;font-size:13px;color:#1b5e20;font-weight:bold;margin-bottom:7px;animation:pop .5s ease}
+
+/* mini result */
+.mini-result-card{background:#f5fbf5;border:2px solid #d0a0e0;border-radius:14px;padding:18px;text-align:center;margin:12px 0}
+.mini-result-card h3{font-size:18px;color:#6a1b9a;margin-bottom:8px}
+.mini-result-card .big-num{font-size:36px;font-weight:bold;color:#2d7a2d}
+.mini-btn{background:#9c27b0;color:white;border:none;border-radius:10px;padding:10px 22px;font-size:14px;cursor:pointer;margin:4px;transition:background .2s}
+.mini-btn:hover{background:#7b1fa2}
+.mini-btn-sec{background:white;color:#9c27b0;border:2px solid #9c27b0;border-radius:10px;padding:10px 22px;font-size:14px;cursor:pointer;margin:4px}
+.mini-btn-sec:hover{background:#fdf5ff}
+
+/* Volume panel */
+#volume-panel{display:none;position:fixed;top:62px;right:14px;z-index:1000;background:white;border:2px solid #b0d0b0;border-radius:16px;padding:16px 18px;width:230px;box-shadow:0 4px 20px rgba(0,0,0,.18);animation:fadeIn .2s ease}
+#volume-panel.open{display:block}
+.vol-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.vol-row:last-child{margin-bottom:0}
+.vol-label{font-size:12px;color:#555;width:60px;flex-shrink:0}
+.vol-slider{flex:1;accent-color:#3a8a3a;cursor:pointer}
+.vol-mute-btn{width:30px;height:30px;border:1px solid #ddd;border-radius:50%;background:#f5f5f5;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .13s}
+.vol-mute-btn:hover{background:#eee}
+.vol-section-title{font-size:11px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.vol-close{width:100%;margin-top:12px;padding:7px;border:none;border-radius:8px;background:#f0f5f0;color:#2d5a27;font-size:12px;cursor:pointer;font-weight:bold}
+.vol-close:hover{background:#e0ede0}
+
+/* Fix mini-level-btn vertical text alignment */
+.mini-level-btn{padding:10px 6px;font-size:11px;font-weight:600;color:#6a1b9a;background:transparent;border:none;border-right:1px solid #e8d0f0;cursor:pointer;transition:background .13s;text-align:center;vertical-align:middle;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;line-height:1.3}
+.mini-level-btn:last-child{border-right:none}
+.mini-level-btn:hover{background:#f3e5f5;color:#4a148c}
+.mini-level-btn span{font-size:10px;color:#aaa;font-weight:normal}
+
+/* Secret level card */
+.mode-card-secret{border:2px solid #ccc;border-radius:16px;padding:12px 15px;text-align:left;background:#f5f5f5;display:flex;align-items:center;gap:12px;opacity:.65;cursor:default;transition:border-color .15s,background .15s,transform .1s}
+.mode-card-secret.unlocked{border-color:#f9a825;background:#fffde7;opacity:1;cursor:pointer}
+.mode-card-secret.unlocked:hover{border-color:#f57f17;background:#fff9c4;transform:translateY(-2px)}
+.mode-card-secret .solo-title{font-size:13px;font-weight:bold;color:#999;margin-bottom:2px}
+.mode-card-secret.unlocked .solo-title{color:#e65100}
+.mode-card-secret .solo-desc{font-size:11px;color:#bbb}
+.mode-card-secret.unlocked .solo-desc{color:#888}
+</style>
+</head>
+<body>
+<button id="music-fab" onclick="toggleMusic()" title="Configurar audio">🎵</button>
+
+<!-- Volume Panel -->
+<div id="volume-panel">
+  <div class="vol-section-title">🎛️ Control de Audio</div>
+  <div class="vol-row">
+    <span class="vol-label">🎵 Música</span>
+    <input class="vol-slider" type="range" min="0" max="1" step="0.05" value="0.5"
+      oninput="setMusicVolume(parseFloat(this.value))">
+    <button class="vol-mute-btn" id="music-mute-btn" onclick="toggleMusicMute()">🔊</button>
+  </div>
+  <div class="vol-row">
+    <span class="vol-label">🐦 Cantos</span>
+    <input class="vol-slider" type="range" min="0" max="1" step="0.05" value="0.5"
+      oninput="setBirdVolume(parseFloat(this.value))">
+    <button class="vol-mute-btn" id="bird-mute-btn" onclick="toggleBirdMute()">🔊</button>
+  </div>
+  <div class="vol-row">
+    <span class="vol-label">🎮 Efectos</span>
+    <input class="vol-slider" type="range" min="0" max="1" step="0.05" value="0.5"
+      oninput="setSfxVolume(parseFloat(this.value))">
+    <button class="vol-mute-btn" id="sfx-mute-btn" onclick="toggleSfxMute()">🔊</button>
+  </div>
+  <button class="vol-close" onclick="closeVolumePanel()">Cerrar</button>
+</div>
+<div id="toast"></div>
+
+<!-- Records Modal -->
+<div id="records-modal" onclick="closeRecordsModal(event)">
+  <div class="records-modal-box">
+    <h2>📊 Mis Récords</h2>
+    <p class="rm-subtitle" id="rm-rank-line"></p>
+    <div id="rm-content"></div>
+    <button class="rm-close" onclick="closeRecordsModal()">Cerrar</button>
+  </div>
+</div>
+
+<!-- ══ MENU ══ -->
+<div id="menu-screen" class="screen active">
+  <h1>🐦 Adiviná el Ave</h1>
+  <p class="tagline">Entrenamiento de identificación de aves argentinas</p>
+  <div class="overall-progress-wrap" onclick="openRecordsModal()" title="Ver récords">
+    <div class="overall-progress-label">
+      <span>Progreso total &nbsp;<span class="rank-title" id="rank-title-label"></span></span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;color:#f9a825;font-weight:bold" id="star-counter">⭐ 0/32</span>
+        <span class="pct" id="overall-pct-label">0%</span>
+      </span>
+    </div>
+    <div class="bar-outer"><div class="bar-inner" id="overall-bar" style="width:0%"></div></div>
+    <div class="overall-click-hint">Tocá para ver tus récords →</div>
+  </div>
+  <div class="mode-groups" id="mode-groups-container">
+    <!-- Por Imagen -->
+    <div class="mode-group" id="group-imagen">
+      <div class="mode-group-header">
+        <span class="mode-group-icon">🖼️</span>
+        <span class="mode-group-title">Por Imagen</span>
+        <span class="group-prog" id="gp-imagen"></span>
+      </div>
+      <div class="mode-group-btns">
+        <button class="sub-btn" id="sub-imagen-opciones" onclick="sfx.click();selectMode('imagen')">
+          <span class="sub-btn-icon">🔘</span>Opciones<span class="sub-btn-label">Elegí entre 4 nombres</span>
+          <span class="sub-progress" id="sp-imagen-opciones"></span><span class="lock-tooltip" id="lt-imagen-opciones"></span>
+        </button>
+        <button class="sub-btn" id="sub-imagen-libre" onclick="sfx.click();selectMode('imagen-libre')">
+          <span class="sub-btn-icon">✏️</span>Escribir<span class="sub-btn-label">Escribí el nombre vos</span>
+          <span class="sub-progress" id="sp-imagen-libre"></span><span class="lock-tooltip" id="lt-imagen-libre"></span>
+        </button>
+      </div>
+    </div>
+    <!-- Por Nombre -->
+    <div class="mode-group" id="group-nombre">
+      <div class="mode-group-header">
+        <span class="mode-group-icon">🔤</span>
+        <span class="mode-group-title">Por Nombre</span>
+        <span class="group-prog" id="gp-nombre"></span>
+      </div>
+      <div class="mode-group-btns">
+        <button class="sub-btn" id="sub-nombre-imagen" onclick="sfx.click();selectMode('nombre')">
+          <span class="sub-btn-icon">🖼️</span>Imagen<span class="sub-btn-label">Elegí la foto correcta</span>
+          <span class="sub-progress" id="sp-nombre-imagen"></span><span class="lock-tooltip" id="lt-nombre-imagen"></span>
+        </button>
+        <button class="sub-btn" id="sub-nombre-sonido" onclick="sfx.click();selectMode('nombre-sonido')">
+          <span class="sub-btn-icon">🔊</span>Sonido<span class="sub-btn-label">Elegí el canto correcto</span>
+          <span class="sub-progress" id="sp-nombre-sonido"></span><span class="lock-tooltip" id="lt-nombre-sonido"></span>
+        </button>
+      </div>
+    </div>
+    <!-- Por Sonido -->
+    <div class="mode-group" id="group-sonido">
+      <div class="mode-group-header">
+        <span class="mode-group-icon">🎧</span>
+        <span class="mode-group-title">Por Sonido</span>
+        <span class="group-prog" id="gp-sonido"></span>
+      </div>
+      <div class="mode-group-btns">
+        <button class="sub-btn" id="sub-sonido-opciones" onclick="sfx.click();selectMode('sonido')">
+          <span class="sub-btn-icon">🔘</span>Opciones<span class="sub-btn-label">Elegí entre 4 nombres</span>
+          <span class="sub-progress" id="sp-sonido-opciones"></span><span class="lock-tooltip" id="lt-sonido-opciones"></span>
+        </button>
+        <button class="sub-btn" id="sub-sonido-libre" onclick="sfx.click();selectMode('sonido-libre')">
+          <span class="sub-btn-icon">✏️</span>Escribir<span class="sub-btn-label">Escribí el nombre vos</span>
+          <span class="sub-progress" id="sp-sonido-libre"></span><span class="lock-tooltip" id="lt-sonido-libre"></span>
+        </button>
+      </div>
+    </div>
+    <!-- Modo Aleatorio -->
+    <div class="mode-group" id="group-aleatorio">
+      <div class="mode-group-header">
+        <span class="mode-group-icon">🎲</span>
+        <span class="mode-group-title">Modo Aleatorio</span>
+        <span class="group-prog" id="gp-aleatorio"></span>
+      </div>
+      <div class="mode-group-btns">
+        <button class="sub-btn" id="sub-aleatorio-opc" onclick="sfx.click();selectMode('aleatorio-opc')">
+          <span class="sub-btn-icon">🔘</span>Con opciones
+          <span class="sub-btn-label">Imagen, nombre o foto al azar</span>
+          <span class="sub-progress" id="sp-aleatorio-opc"></span>
+          <span class="lock-tooltip" id="lt-aleatorio-opc"></span>
+        </button>
+        <button class="sub-btn" id="sub-aleatorio-libre" onclick="sfx.click();selectMode('aleatorio-libre')">
+          <span class="sub-btn-icon">✏️</span>Sin opciones
+          <span class="sub-btn-label">Escribir, sonido o canto al azar</span>
+          <span class="sub-progress" id="sp-aleatorio-libre"></span>
+          <span class="lock-tooltip" id="lt-aleatorio-libre"></span>
+        </button>
+      </div>
+    </div>
+    <!-- Guía -->
+    <div class="mode-card-solo" onclick="sfx.click();openGuide()">
+      <span class="solo-icon">📖</span>
+      <div>
+        <div class="solo-title">Guía de Aves</div>
+        <div class="solo-desc">Explorá todas las aves con sus nombres, nombres científicos y cantos.</div>
+      </div>
+    </div>
+    <!-- Minijuegos -->
+    <div class="mode-card-mini" onclick="sfx.click();openMinigames()">
+      <span class="solo-icon">🎮</span>
+      <div>
+        <div class="solo-title">Minijuegos</div>
+        <div class="solo-desc">Memotest, Ordenar y Encontrá al Impostor. ¡Para practicar sin presión!</div>
+      </div>
+    </div>
+    <!-- Nivel Secreto -->
+    <div class="mode-card-secret" id="secret-card" onclick="sfx.click();openSecretLevel()">
+      <span class="solo-icon" id="secret-icon">🔒</span>
+      <div>
+        <div class="solo-title" id="secret-title">Mensaje Secreto</div>
+        <div class="solo-desc" id="secret-desc">Completá el 100% del juego para desbloquearlo.</div>
+      </div>
+    </div>
+  </div>
+  <div class="author-credit"><strong>Hecho por Emanuel Juliá</strong><br>Compositor · Director Coral</div>
+</div>
+
+<!-- ══ DB SELECTION ══ -->
+<div id="db-screen" class="screen">
+  <button class="back-btn" onclick="sfx.click();goMenu()" style="display:block;margin-bottom:12px">← Volver al menú</button>
+  <h2>🗂️ Elegí la dificultad</h2>
+  <p class="db-subtitle" id="db-mode-label"></p>
+  <div class="db-cards" id="db-cards-container"></div>
+</div>
+
+<!-- ══ GAME ══ -->
+<div id="game-screen" class="screen">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <button class="back-btn" style="margin:0" onclick="sfx.click();goMenu()">← Volver al menú</button>
+    <button id="autoplay-btn" onclick="toggleAutoPlay()" style="font-size:11px;padding:5px 10px;border-radius:99px;border:1px solid #b0d0b0;background:#f5fbf5;cursor:pointer;color:#2d5a27;transition:background .15s" title="Reproducir sonido al aparecer el ave">🔊 Auto: OFF</button>
+  </div>
+  <h2 class="game-title" id="game-title"></h2>
+  <div id="stats"><div><span class="label">Pregunta </span><span class="value" id="questionNum">1</span></div><div><span class="value" id="score">0</span><span class="label"> aciertos</span></div></div>
+  <div id="timer-display">⏱ 0:00</div>
+  <div id="progress-wrap"><div id="progress-bar" style="width:0%"></div></div>
+  <div id="progress-label"></div>
+  <div id="mode-imagen" style="display:none">
+    <div class="image-and-sound"><div class="image-box"><img id="image" src="" alt="ave"></div><button class="sound-btn" id="sound-btn-imagen" onclick="toggleBirdSound('imagen')">🔊</button></div>
+    <div class="obra-label" id="obra-imagen"></div>
+    <div id="options-imagen"></div>
+  </div>
+  <div id="mode-imagen-libre" style="display:none">
+    <div class="image-and-sound"><div class="image-box"><img id="image-libre" src="" alt="ave"></div><button class="sound-btn" id="sound-btn-imagen-libre" onclick="toggleBirdSound('imagen-libre')">🔊</button></div>
+    <div class="obra-label" id="obra-imagen-libre"></div>
+    <p class="write-hint">Escribí el nombre del ave:</p>
+    <div class="write-input-wrap"><input type="text" id="write-imagen-input" placeholder="Nombre del ave..." autocomplete="off" autocorrect="off" spellcheck="false"><button class="write-submit-btn" id="write-imagen-btn" onclick="checkWriteAnswer('imagen-libre')">✓</button></div>
+    <div class="write-answer-reveal" id="write-imagen-reveal"></div>
+  </div>
+  <div id="mode-nombre" style="display:none">
+    <div class="nombre-header"><div id="nombre-prompt"></div><button class="sound-btn" id="sound-btn-nombre" onclick="toggleBirdSound('nombre')">🔊</button></div>
+    <div id="nombre-obra"></div><div id="options-nombre"></div>
+  </div>
+  <div id="mode-nombre-sonido" style="display:none">
+    <div class="nombre-header"><div id="nombre-sonido-prompt"></div></div>
+    <div id="nombre-sonido-obra"></div>
+    <p style="font-size:11px;color:#aaa;margin:3px 0 7px">Escuchá los cantos y elegí el del ave:</p>
+    <div id="options-nombre-sonido"></div>
+  </div>
+  <div id="mode-sonido" style="display:none">
+    <div class="sonido-player"><div class="sonido-label">Escuchá el canto del ave</div><button class="play-big-btn" id="play-big-btn" onclick="toggleBirdSound('sonido')">▶️</button><div class="play-hint">Clic para reproducir / detener</div></div>
+    <div class="reveal-wrap" id="sonido-reveal"><div class="reveal-img-box"><img id="reveal-img" src="" alt=""></div><div class="reveal-obra" id="reveal-obra"></div></div>
+    <div id="options-sonido"></div>
+  </div>
+  <div id="mode-sonido-libre" style="display:none">
+    <div class="sonido-player"><div class="sonido-label">Escuchá el canto del ave</div><button class="play-big-btn" id="play-big-btn-libre" onclick="toggleBirdSound('sonido-libre')">▶️</button><div class="play-hint">Clic para reproducir / detener</div></div>
+    <div class="reveal-wrap" id="sonido-libre-reveal"><div class="reveal-img-box"><img id="reveal-img-libre" src="" alt=""></div><div class="reveal-obra" id="reveal-obra-libre"></div></div>
+    <p class="write-hint">Escribí el nombre del ave:</p>
+    <div class="write-input-wrap"><input type="text" id="write-sonido-input" placeholder="Nombre del ave..." autocomplete="off" autocorrect="off" spellcheck="false"><button class="write-submit-btn" id="write-sonido-btn" onclick="checkWriteAnswer('sonido-libre')">✓</button></div>
+    <div class="write-answer-reveal" id="write-sonido-reveal"></div>
+  </div>
+  <p id="result"></p>
+</div>
+
+<!-- ══ GUIDE ══ -->
+<div id="guide-screen" class="screen">
+  <div class="guide-header">
+    <button class="back-btn" onclick="sfx.click();goMenu()" style="margin:0">← Menú</button>
+    <h2>📖 Guía de Aves</h2>
+  </div>
+  <div class="guide-filters" id="guide-filters"></div>
+  <div class="guide-list" id="guide-list"></div>
+</div>
+
+<!-- ══ MINIGAMES MENU ══ -->
+<div id="minigames-screen" class="screen">
+  <button class="back-btn" onclick="sfx.click();goMenu()" style="display:block;margin-bottom:12px">← Volver al menú</button>
+  <h2 style="color:#6a1b9a;margin-bottom:4px">🎮 Minijuegos</h2>
+  <p style="font-size:12px;color:#aaa;margin-bottom:16px">Practicá sin presión — no cuentan para tu progreso</p>
+  <div style="display:flex;flex-direction:column;gap:14px">
+
+    <!-- MEMOTEST -->
+    <div style="border:2px solid #d0a0e0;border-radius:16px;background:#fdf5ff;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:0;padding:0;border-bottom:1px solid #e8d0f0;min-height:62px">
+        <span style="font-size:22px;padding:0 14px;flex-shrink:0">🃏</span>
+        <div style="flex:1;padding:10px 10px 10px 0">
+          <div style="font-size:13px;font-weight:bold;color:#6a1b9a;margin-bottom:2px">Memotest</div>
+          <div style="font-size:11px;color:#888;line-height:1.3">Encontrá los pares imagen+nombre. Al acertar suena el canto.</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr">
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('memo','facil')">🟢<br><span>Fácil</span></button>
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('memo','medio')">🔵<br><span>Medio</span></button>
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('memo','dificil')">🔴<br><span>Difícil</span></button>
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('memo','experto')">🟣<br><span>Experto</span></button>
+      </div>
+    </div>
+
+    <!-- ORDENAR -->
+    <div style="border:2px solid #d0a0e0;border-radius:16px;background:#fdf5ff;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:0;padding:0;border-bottom:1px solid #e8d0f0;min-height:62px">
+        <span style="font-size:22px;padding:0 14px;flex-shrink:0">🔀</span>
+        <div style="flex:1;padding:10px 10px 10px 0">
+          <div style="font-size:13px;font-weight:bold;color:#6a1b9a;margin-bottom:2px">Ordenar</div>
+          <div style="font-size:11px;color:#888;line-height:1.3">Arrastrá los nombres a la imagen correcta.</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr">
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('ordenar','facil')">🟢<br><span>Fácil</span></button>
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('ordenar','medio')">🔵<br><span>Medio</span></button>
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('ordenar','dificil')">🔴<br><span>Difícil</span></button>
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('ordenar','experto')">🟣<br><span>Experto</span></button>
+      </div>
+    </div>
+
+    <!-- IMPOSTOR -->
+    <div style="border:2px solid #d0a0e0;border-radius:16px;background:#fdf5ff;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:0;padding:0;border-bottom:1px solid #e8d0f0;min-height:62px">
+        <span style="font-size:22px;padding:0 14px;flex-shrink:0">🕵️</span>
+        <div style="flex:1;padding:10px 10px 10px 0">
+          <div style="font-size:13px;font-weight:bold;color:#6a1b9a;margin-bottom:2px">Encontrá al Impostor</div>
+          <div style="font-size:11px;color:#888;line-height:1.3">Uno de los 4 nombres no corresponde a ninguna ave que ves.</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr">
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('impostor','facil')">🟢<br><span>Fácil</span></button>
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('impostor','medio')">🔵<br><span>Medio</span></button>
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('impostor','dificil')">🔴<br><span>Difícil</span></button>
+        <button class="mini-level-btn" onclick="sfx.click();launchMiniGame('impostor','experto')">🟣<br><span>Experto</span></button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ MEMOTEST ══ -->
+<div id="memo-screen" class="screen">
+  <button class="back-btn" onclick="sfx.click();showScreen('minigames-screen')" style="display:block;margin-bottom:8px">← Minijuegos</button>
+  <h2 style="font-size:18px;color:#6a1b9a;margin-bottom:4px">🃏 Memotest <span id="memo-level-badge" style="font-size:13px"></span></h2>
+  <div class="memo-stats"><span>Movimientos: <span class="mv" id="memo-moves">0</span></span><span>Pares: <span class="mv" id="memo-pairs">0</span> / <span id="memo-total">0</span></span></div>
+  <div class="memo-grid g-4" id="memo-grid"></div>
+  <div id="memo-result" style="display:none" class="mini-result-card">
+    <h3>🎉 ¡Completaste el Memotest!</h3>
+    <div>Movimientos: <span class="big-num" id="memo-final-moves">0</span></div>
+    <div style="margin-top:12px">
+      <button class="mini-btn" onclick="startMemotest()">Jugar de nuevo</button>
+      <button class="mini-btn-sec" onclick="sfx.click();showScreen('minigames-screen')">Cambiar minijuego</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ORDENAR ══ -->
+<div id="ordenar-screen" class="screen">
+  <button class="back-btn" onclick="sfx.click();showScreen('minigames-screen')" style="display:block;margin-bottom:8px">← Minijuegos</button>
+  <h2 style="font-size:18px;color:#6a1b9a;margin-bottom:4px">🔀 Ordenar <span id="ordenar-level-badge" style="font-size:13px"></span></h2>
+  <p style="font-size:12px;color:#aaa;margin-bottom:10px">Arrastrá los nombres al casillero de la imagen correspondiente</p>
+  <div class="ordenar-grid" id="ordenar-grid"></div>
+  <div class="ordenar-names" id="ordenar-names"></div>
+  <p id="ordenar-result" style="font-size:16px;min-height:22px;margin:6px 0;font-weight:bold"></p>
+  <div id="ordenar-done" style="display:none" class="mini-result-card">
+    <h3>✅ ¡Todas asociadas correctamente!</h3>
+    <div style="margin-top:12px">
+      <button class="mini-btn" onclick="startOrdenar()">Jugar de nuevo</button>
+      <button class="mini-btn-sec" onclick="sfx.click();showScreen('minigames-screen')">Cambiar minijuego</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ IMPOSTOR ══ -->
+<div id="impostor-screen" class="screen">
+  <button class="back-btn" onclick="sfx.click();showScreen('minigames-screen')" style="display:block;margin-bottom:8px">← Minijuegos</button>
+  <h2 style="font-size:18px;color:#6a1b9a;margin-bottom:4px">🕵️ Impostor <span id="impostor-level-badge" style="font-size:13px"></span></h2>
+  <p style="font-size:12px;color:#aaa;margin-bottom:10px">¿Cuál de estos nombres <strong>NO</strong> corresponde a ninguna de las aves que ves?</p>
+  <div class="impostor-grid" id="impostor-grid"></div>
+  <div class="impostor-names" id="impostor-names"></div>
+  <p id="impostor-result" style="font-size:16px;min-height:22px;margin:4px 0;font-weight:bold"></p>
+  <div id="impostor-score-wrap" style="display:flex;justify-content:center;gap:20px;font-size:13px;color:#555;margin:6px 0">
+    <span>Aciertos: <span style="font-weight:bold;color:#2d5a27" id="imp-score">0</span></span>
+    <span>Ronda: <span style="font-weight:bold" id="imp-round">1</span> / 10</span>
+  </div>
+  <div id="imp-done" style="display:none" class="mini-result-card">
+    <h3>🕵️ ¡Ronda terminada!</h3>
+    <div>Tu puntaje: <span class="big-num" id="imp-final">0</span> / 10</div>
+    <div style="margin-top:12px">
+      <button class="mini-btn" onclick="startImpostor()">Jugar de nuevo</button>
+      <button class="mini-btn-sec" onclick="sfx.click();showScreen('minigames-screen')">Cambiar minijuego</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SECRET LEVEL ══ -->
+<div id="secret-screen" class="screen">
+  <button class="back-btn" onclick="sfx.click();goMenu()" style="display:block;margin-bottom:16px">← Volver al menú</button>
+  <div style="text-align:center;background:white;border-radius:20px;box-shadow:0 4px 28px rgba(0,0,0,.12);padding:32px 24px">
+    <div style="font-size:48px;margin-bottom:12px">🦜</div>
+    <h2 style="font-size:22px;color:#2d5a27;margin-bottom:16px">Nivel Secreto completado</h2>
+    <p style="font-size:14px;color:#444;line-height:1.8;text-align:left">
+      Gracias por haber jugado y haber completado todo el juego. ¡Felicitaciones! Has demostrado ser una persona sensible, atenta y que se interesa y preocupa por las aves y seguramente también por la naturaleza. Personas como vos hacen que este mundo sea un lugar mejor, cuidando a nuestro medio ambiente y a los animales y plantas que viven en él.
+      <br><br>
+      No se puede amar lo que uno desconoce, pero informando sobre las especies que habitan en él uno se involucra y sensibiliza, y de esta manera aprende lo que existe para poder defenderlo y cuidarlo.
+      <br><br>
+      Compartí este juego con otros, grandes y chicos, así todos podemos crecer amando a la naturaleza y así, como seres humanos en armonía con el planeta Tierra, <strong>volar muy alto</strong>. 🌿
+    </p>
+    <div style="margin-top:24px;font-size:32px">🌍🌿🐦⭐</div>
+  </div>
+</div>
+<div id="results-screen" class="screen">
+  <h2>¡Fin del juego!</h2>
+  <p class="subtitle" id="res-subtitle"></p>
+  <div class="result-cards">
+    <div class="result-card"><div class="card-label">Aciertos</div><div class="card-value" id="res-score">—</div><div class="card-sub" id="res-score-sub">de 0</div></div>
+    <div class="result-card"><div class="card-label">Tiempo</div><div class="card-value" id="res-time">—</div><div class="card-sub">min : seg</div></div>
+  </div>
+  <div class="records" id="records-wrap"></div>
+  <div class="best-scores" id="best-scores-display"></div>
+  <div class="results-buttons">
+    <button class="btn-primary" id="play-again">Jugar de nuevo</button>
+    <button class="btn-secondary" onclick="sfx.click();goMenu()">Cambiar modo</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  DATABASES
+// ══════════════════════════════════════════
+const databases={
+  facil:[
+    {image:"imagenes/facil/benteveo.jpg",   name:"Benteveo",     obra:"Pitangus sulphuratus",    cat:["Tiránidos","Paseriformes"]},
+    {image:"imagenes/facil/hornero.jpg",     name:"Hornero",      obra:"Furnarius rufus",         cat:["Furnáridos","Paseriformes"]},
+    {image:"imagenes/facil/zorzal.jpg",      name:"Zorzal",       obra:"Turdus amaurochalinus",   cat:["Tordos","Paseriformes"]},
+    {image:"imagenes/facil/calandria.jpg",   name:"Calandria",    obra:"Mimus saturninus",        cat:["Mímidos","Paseriformes"]},
+    {image:"imagenes/facil/gorrion.jpg",     name:"Gorrión",      obra:"Passer domesticus",       cat:["Gorriones","Paseriformes"]},
+    {image:"imagenes/facil/paloma.jpg",      name:"Paloma",       obra:"Columba livia",           cat:["Palomas"]},
+    {image:"imagenes/facil/torcaza.jpg",     name:"Torcaza",      obra:"Zenaida auriculata",      cat:["Palomas"]},
+    {image:"imagenes/facil/picazuro.jpg",    name:"Picazuro",     obra:"Patagioenas picazuro",    cat:["Palomas"]},
+    {image:"imagenes/facil/cardenal.jpg",    name:"Cardenal",     obra:"Paroaria coronata",       cat:["Tangaras","Paseriformes"]},
+    {image:"imagenes/facil/golondrina.jpg",  name:"Golondrina",   obra:"Progne tapera",           cat:["Golondrinas","Paseriformes"]},
+    {image:"imagenes/facil/ratona.jpg",      name:"Ratona",       obra:"Troglodytes aedon",       cat:["Troglodítidos","Paseriformes"]},
+    {image:"imagenes/facil/tordomusico.jpg", name:"Tordo músico", obra:"Agelaioides badius",      cat:["Ictéridos","Paseriformes"]},
+    {image:"imagenes/facil/churrinche.jpg",  name:"Churrinche",   obra:"Pyrocephalus rubinus",    cat:["Tiránidos","Paseriformes"]},
+    {image:"imagenes/facil/suiriri.jpg",     name:"Suirirí real", obra:"Tyrannus melancholicus",  cat:["Tiránidos","Paseriformes"]},
+    {image:"imagenes/facil/gaviota.jpg",     name:"Gaviota",      obra:"Larus dominicanus",       cat:["Gaviotas","Playeras"]},
+    {image:"imagenes/facil/canario.jpg",     name:"Canario",      obra:"Serinus canaria",          cat:["Fringílidos","Paseriformes"]},
+  ],
+  medio:[
+    {image:"imagenes/facil/chimango.jpg",          name:"Chimango",             obra:"Milvago chimango",         cat:["Rapaces","Falcónidos"]},
+    {image:"imagenes/facil/caracho.jpg",           name:"Carancho",             obra:"Caracara plancus",         cat:["Rapaces","Falcónidos"]},
+    {image:"imagenes/facil/cotorra.jpg",           name:"Cotorra",              obra:"Myiopsitta monachus",      cat:["Loros","Psitácidos"]},
+    {image:"imagenes/facil/pirincho.jpg",          name:"Pirincho",             obra:"Guira guira",              cat:["Cucúlidos"]},
+    {image:"imagenes/facil/lechuzaviscachera.jpg", name:"Lechuza vizcachera",   obra:"Athene cunicularia",       cat:["Rapaces","Lechuzas","Búhos"]},
+    {image:"imagenes/facil/garzablanca.jpg",       name:"Garza blanca",         obra:"Ardea alba",               cat:["Garzas","Zancudas"]},
+    {image:"imagenes/facil/coscoroba.jpg",         name:"Coscoroba",            obra:"Coscoroba coscoroba",      cat:["Patos","Acuáticas"]},
+    {image:"imagenes/facil/gallareta.jpg",         name:"Gallareta",            obra:"Fulica armillata",         cat:["Gallaretas","Acuáticas"]},
+    {image:"imagenes/facil/patopicazo.jpg",        name:"Pato picazo",          obra:"Netta peposaca",           cat:["Patos","Acuáticas"]},
+    {image:"imagenes/facil/patomaicero.jpg",       name:"Pato maicero",         obra:"Anas georgica",            cat:["Patos","Acuáticas"]},
+    {image:"imagenes/facil/patocapuchino.jpg",     name:"Pato capuchino",       obra:"Anas versicolor",          cat:["Patos","Acuáticas"]},
+    {image:"imagenes/facil/patobarcino.jpg",       name:"Pato barcino",         obra:"Anas flavirostris",        cat:["Patos","Acuáticas"]},
+    {image:"imagenes/facil/picabuey.jpg",          name:"Pica buey",            obra:"Molothrus bonariensis",    cat:["Ictéridos","Paseriformes"]},
+    {image:"imagenes/facil/gavilanmixto.jpg",      name:"Gavilán mixto",        obra:"Parabuteo unicinctus",     cat:["Rapaces","Accipítridos"]},
+    {image:"imagenes/facil/carpinteroreal.jpg",    name:"Carpintero real común",obra:"Colaptes melanochloros",   cat:["Carpinteros","Pícidos"]},
+    {image:"imagenes/facil/carpinterogigante.jpg", name:"Carpintero gigante",   obra:"Campephilus robustus",     cat:["Carpinteros","Pícidos"]},
+    {image:"imagenes/facil/chinchero.jpg",         name:"Chinchero",            obra:"Drymornis bridgesii",      cat:["Trepadoras","Dendrocoláptidos"]},
+    {image:"imagenes/facil/diamantemandarin.jpg",  name:"Diamante mandarín",    obra:"Taeniopygia guttata",      cat:["Estrildidos","Paseriformes"]},
+  ],
+  dificil:[
+    {image:"imagenes/siriripampa.jpg",           name:"Sirirí pampa",            obra:"Dendrocygna viduata",       cat:["Patos","Acuáticas"]},
+    {image:"imagenes/atajacaminoschico.jpg",     name:"Atajacaminos chico",      obra:"Setopagis parvula",         cat:["Chotacabras","Caprimúlgidos"]},
+    {image:"imagenes/bailarinblanco.jpg",        name:"Bailarín blanco",         obra:"Manacus manacus",           cat:["Manaquines","Paseriformes"]},
+    {image:"imagenes/bandurriaaustral.jpg",      name:"Bandurria austral",       obra:"Theristicus melanopis",     cat:["Zancudas","Ibis"]},
+    {image:"imagenes/becasinacomun.jpg",         name:"Becasina común",          obra:"Gallinago gallinago",       cat:["Playeras","Escolopácidos"]},
+    {image:"imagenes/bigua.jpg",                 name:"Biguá",                   obra:"Nannopterum brasilianus",   cat:["Acuáticas","Cormoranes"]},
+    {image:"imagenes/caburechico.jpg",           name:"Caburé chico",            obra:"Glaucidium brasilianum",    cat:["Rapaces","Lechuzas","Búhos"]},
+    {image:"imagenes/celestino.jpg",             name:"Celestino",               obra:"Thraupis sayaca",           cat:["Tangaras","Paseriformes"]},
+    {image:"imagenes/chaja.jpg",                 name:"Chajá",                   obra:"Chauna torquata",           cat:["Acuáticas","Anátidos"]},
+    {image:"imagenes/chiflon.JPG",               name:"Chiflón",                 obra:"Syrigma sibilatrix",        cat:["Garzas","Zancudas"]},
+    {image:"imagenes/doraditopardo.jpg",         name:"Doradito pardo",          obra:"Pseudocolopteryx dinellianus",cat:["Tiránidos","Paseriformes"]},
+    {image:"imagenes/hococolorado.jpg",          name:"Hocó colorado",           obra:"Tigrisoma lineatum",        cat:["Garzas","Zancudas","Acuáticas"]},
+    {image:"imagenes/mosquitero.jpg",            name:"Mosquitero",              obra:"Phylloscopus collybita",    cat:["Sylviidos","Paseriformes"]},
+    {image:"imagenes/nacurutu.jpg",              name:"Ñacurutú",                obra:"Bubo virginianus",          cat:["Rapaces","Lechuzas","Búhos"]},
+    {image:"imagenes/patofierro.jpg",            name:"Pato fierro",             obra:"Anas platalea",             cat:["Patos","Acuáticas"]},
+    {image:"imagenes/pinguinorey.jpg",           name:"Pingüino rey",            obra:"Aptenodytes patagonicus",   cat:["Pingüinos","Acuáticas"]},
+    {image:"imagenes/pitiayumi.jpg",             name:"Pitiayumí",               obra:"Setophaga pitiayumi",       cat:["Parúlidos","Paseriformes"]},
+    {image:"imagenes/reinamoragrande.jpg",       name:"Reina mora grande",       obra:"Cyanocompsa brissonii",     cat:["Cardenálidos","Paseriformes"]},
+    {image:"imagenes/sietevestidospampeano.jpg", name:"Siete vestidos pampeano", obra:"Poospiza nigrorufa",        cat:["Tangaras","Paseriformes"]},
+    {image:"imagenes/tacuaritaazul.jpg",         name:"Tacuarita azul",          obra:"Polioptila dumicola",       cat:["Sylviidos","Paseriformes"]},
+    {image:"imagenes/urutau.jpg",                name:"Urutaú",                  obra:"Nyctibius griseus",         cat:["Chotacabras","Nyctibiidos"]},
+    {image:"imagenes/jilguero.jpg",              name:"Jilguero",                obra:"Sicalis flaveola",           cat:["Fringílidos","Paseriformes"]},
+  ]
+};
+// Experto = unión de los 3
+databases.experto=[...databases.facil,...databases.medio,...databases.dificil];
+
+const allBirds=[
+  ...databases.facil.map(b=>({...b,level:"facil"})),
+  ...databases.medio.map(b=>({...b,level:"medio"})),
+  ...databases.dificil.map(b=>({...b,level:"dificil"})),
+];
+const ALL_CATS=[...new Set(allBirds.flatMap(b=>b.cat))].sort((a,b)=>a.localeCompare(b,"es"));
+
+// ══════════════════════════════════════════
+//  RANK SYSTEM
+// ══════════════════════════════════════════
+const RANKS=[
+  {min:0,  label:"🥚 Amateur"},
+  {min:10, label:"🌱 Observador Inicial"},
+  {min:22, label:"🔭 Explorador"},
+  {min:35, label:"🦜 Aficionado"},
+  {min:48, label:"🌿 Naturalista"},
+  {min:60, label:"🦅 Avistador Experimentado"},
+  {min:72, label:"📚 Ornitólogo Aficionado"},
+  {min:82, label:"🏆 Profesional de Aves"},
+  {min:90, label:"🌟 Observador Veterano"},
+  {min:97, label:"🦉 Gran Experto en Aves"},
+];
+function getRankLabel(pct){let r=RANKS[0];for(const x of RANKS){if(pct>=x.min)r=x;}return r.label;}
+
+// ══════════════════════════════════════════
+//  UNLOCK SYSTEM
+// ══════════════════════════════════════════
+const DEFAULT_UNLOCKED=new Set(["imagen_facil"]);
+const UNLOCK_HINTS={};
+const UNLOCK_RULES=[
+  {from:"imagen_facil",       pct:40,unlock:"nombre_facil",         label:"Por Nombre — Imagen 🟢 Fácil"},
+  {from:"imagen_facil",       pct:50,unlock:"imagen-libre_facil",   label:"Por Imagen — Escribir 🟢 Fácil"},
+  {from:"imagen_facil",       pct:60,unlock:"imagen_medio",         label:"Por Imagen — Opciones 🔵 Medio"},
+  {from:"imagen_facil",       pct:80,unlock:"sonido_facil",         label:"Por Sonido — Opciones 🟢 Fácil"},
+  {from:"imagen-libre_facil", pct:50,unlock:"imagen-libre_medio",   label:"Por Imagen — Escribir 🔵 Medio"},
+  {from:"imagen-libre_medio", pct:60,unlock:"imagen-libre_dificil", label:"Por Imagen — Escribir 🔴 Difícil"},
+  {from:"imagen_medio",       pct:50,unlock:"nombre_medio",         label:"Por Nombre — Imagen 🔵 Medio"},
+  {from:"imagen_medio",       pct:60,unlock:"imagen_dificil",       label:"Por Imagen — Opciones 🔴 Difícil"},
+  {from:"imagen_dificil",     pct:70,unlock:"nombre_dificil",       label:"Por Nombre — Imagen 🔴 Difícil"},
+  {from:"nombre_facil",       pct:50,unlock:"nombre-sonido_facil",  label:"Por Nombre — Sonido 🟢 Fácil"},
+  {from:"nombre_medio",       pct:50,unlock:"nombre-sonido_medio",  label:"Por Nombre — Sonido 🔵 Medio"},
+  {from:"nombre_dificil",     pct:60,unlock:"nombre-sonido_dificil",label:"Por Nombre — Sonido 🔴 Difícil"},
+  {from:"nombre-sonido_facil",pct:60,unlock:"nombre-sonido_medio",  label:"Por Nombre — Sonido 🔵 Medio"},
+  {from:"nombre-sonido_medio",pct:70,unlock:"nombre-sonido_dificil",label:"Por Nombre — Sonido 🔴 Difícil"},
+  {from:"sonido_facil",       pct:50,unlock:"sonido-libre_facil",   label:"Por Sonido — Escribir 🟢 Fácil"},
+  {from:"sonido_facil",       pct:60,unlock:"sonido_medio",         label:"Por Sonido — Opciones 🔵 Medio"},
+  {from:"sonido_medio",       pct:60,unlock:"sonido-libre_medio",   label:"Por Sonido — Escribir 🔵 Medio"},
+  {from:"sonido_medio",       pct:70,unlock:"sonido_dificil",       label:"Por Sonido — Opciones 🔴 Difícil"},
+  {from:"sonido_dificil",     pct:70,unlock:"sonido-libre_dificil", label:"Por Sonido — Escribir 🔴 Difícil"},
+  {from:"sonido-libre_facil", pct:60,unlock:"sonido-libre_medio",   label:"Por Sonido — Escribir 🔵 Medio"},
+  {from:"sonido-libre_medio", pct:70,unlock:"sonido-libre_dificil", label:"Por Sonido — Escribir 🔴 Difícil"},
+  // Experto unlock: need 70% in all three "dificil" modes of same type
+  {from:"imagen_dificil",     pct:70,unlock:"imagen_experto",       label:"Por Imagen — Opciones 🟣 Experto"},
+  {from:"imagen-libre_dificil",pct:70,unlock:"imagen-libre_experto",label:"Por Imagen — Escribir 🟣 Experto"},
+  {from:"nombre_dificil",     pct:70,unlock:"nombre_experto",       label:"Por Nombre — Imagen 🟣 Experto"},
+  {from:"nombre-sonido_dificil",pct:70,unlock:"nombre-sonido_experto",label:"Por Nombre — Sonido 🟣 Experto"},
+  {from:"sonido_dificil",     pct:70,unlock:"sonido_experto",       label:"Por Sonido — Opciones 🟣 Experto"},
+  {from:"sonido-libre_dificil",pct:70,unlock:"sonido-libre_experto",label:"Por Sonido — Escribir 🟣 Experto"},
+  // Aleatorio-opc: needs 40% in imagen, nombre, sonido (opciones column) — per level
+  // Aleatorio-libre: needs 40% in imagen-libre, nombre-sonido, sonido-libre (libre column) — per level
+  {from:"imagen_facil",          pct:40, unlock:"_aleopc_img_ok",      label:""},
+  {from:"nombre_facil",          pct:40, unlock:"_aleopc_nom_ok",      label:""},
+  {from:"sonido_facil",          pct:40, unlock:"_aleopc_snd_ok",      label:""},
+  {from:"imagen_medio",          pct:40, unlock:"_aleopc_img_med_ok",  label:""},
+  {from:"nombre_medio",          pct:40, unlock:"_aleopc_nom_med_ok",  label:""},
+  {from:"sonido_medio",          pct:40, unlock:"_aleopc_snd_med_ok",  label:""},
+  {from:"imagen_dificil",        pct:40, unlock:"_aleopc_img_dif_ok",  label:""},
+  {from:"nombre_dificil",        pct:40, unlock:"_aleopc_nom_dif_ok",  label:""},
+  {from:"sonido_dificil",        pct:40, unlock:"_aleopc_snd_dif_ok",  label:""},
+  {from:"imagen_experto",        pct:40, unlock:"_aleopc_img_exp_ok",  label:""},
+  {from:"nombre_experto",        pct:40, unlock:"_aleopc_nom_exp_ok",  label:""},
+  {from:"sonido_experto",        pct:40, unlock:"_aleopc_snd_exp_ok",  label:""},
+  {from:"imagen-libre_facil",    pct:40, unlock:"_alelib_img_ok",      label:""},
+  {from:"nombre-sonido_facil",   pct:40, unlock:"_alelib_nom_ok",      label:""},
+  {from:"sonido-libre_facil",    pct:40, unlock:"_alelib_snd_ok",      label:""},
+  {from:"imagen-libre_medio",    pct:40, unlock:"_alelib_img_med_ok",  label:""},
+  {from:"nombre-sonido_medio",   pct:40, unlock:"_alelib_nom_med_ok",  label:""},
+  {from:"sonido-libre_medio",    pct:40, unlock:"_alelib_snd_med_ok",  label:""},
+  {from:"imagen-libre_dificil",  pct:40, unlock:"_alelib_img_dif_ok",  label:""},
+  {from:"nombre-sonido_dificil", pct:40, unlock:"_alelib_nom_dif_ok",  label:""},
+  {from:"sonido-libre_dificil",  pct:40, unlock:"_alelib_snd_dif_ok",  label:""},
+  {from:"imagen-libre_experto",  pct:40, unlock:"_alelib_img_exp_ok",  label:""},
+  {from:"nombre-sonido_experto", pct:40, unlock:"_alelib_nom_exp_ok",  label:""},
+  {from:"sonido-libre_experto",  pct:40, unlock:"_alelib_snd_exp_ok",  label:""},
+];
+
+(function buildHints(){
+  const dbN={facil:"🟢 Fácil",medio:"🔵 Medio",dificil:"🔴 Difícil",experto:"🟣 Experto"};
+  const mN={"imagen":"Imagen-Opc","imagen-libre":"Imagen-Esc","nombre":"Nombre-Img","nombre-sonido":"Nombre-Snd","sonido":"Sonido-Opc","sonido-libre":"Sonido-Esc","aleatorio-opc":"Aleatorio-Opc","aleatorio-libre":"Aleatorio-Libre"};
+  UNLOCK_RULES.forEach(r=>{
+    if(!UNLOCK_HINTS[r.unlock]&&!r.unlock.startsWith("_")){
+      const parts=r.from.split("_");
+      const db=parts[parts.length-1];
+      const m=parts.slice(0,parts.length-1).join("_");
+      UNLOCK_HINTS[r.unlock]=`Obtener ${r.pct}% en ${mN[m]||m} ${dbN[db]||db}`;
+    }
+  });
+})();
+
+// Aleatorio hint text for records modal
+const ALE_OPC_HINT="Necesitás 40% en Imagen-Opc, Nombre-Img y Sonido-Opc del mismo nivel";
+const ALE_LIB_HINT="Necesitás 40% en Imagen-Esc, Nombre-Snd y Sonido-Esc del mismo nivel";
+
+function getUnlocked(){const s=JSON.parse(localStorage.getItem("avesUnlocked5")||"null");if(s)return new Set(s);return new Set(DEFAULT_UNLOCKED);}
+function saveUnlocked(s){localStorage.setItem("avesUnlocked5",JSON.stringify([...s]));}
+function isUnlocked(cell){return getUnlocked().has(cell);}
+
+function checkUnlocks(modeKey,scorePct){
+  const unlocked=getUnlocked();
+  const sizeBefore=unlocked.size;
+  const newlyUnlocked=[];
+  UNLOCK_RULES.forEach(rule=>{
+    if(rule.from===modeKey&&scorePct>=rule.pct&&!unlocked.has(rule.unlock)){
+      unlocked.add(rule.unlock);
+      if(rule.label) newlyUnlocked.push({unlock:rule.unlock,label:rule.label});
+    }
+  });
+  // Derive aleatorio-opc unlocks
+  const aleOpcLevels=[
+    {db:"facil",   flags:["_aleopc_img_ok","_aleopc_nom_ok","_aleopc_snd_ok"],         label:"Aleatorio Con Opciones 🟢 Fácil"},
+    {db:"medio",   flags:["_aleopc_img_med_ok","_aleopc_nom_med_ok","_aleopc_snd_med_ok"],label:"Aleatorio Con Opciones 🔵 Medio"},
+    {db:"dificil", flags:["_aleopc_img_dif_ok","_aleopc_nom_dif_ok","_aleopc_snd_dif_ok"],label:"Aleatorio Con Opciones 🔴 Difícil"},
+    {db:"experto", flags:["_aleopc_img_exp_ok","_aleopc_nom_exp_ok","_aleopc_snd_exp_ok"],label:"Aleatorio Con Opciones 🟣 Experto"},
+  ];
+  aleOpcLevels.forEach(({db,flags,label})=>{
+    const cell=`aleatorio-opc_${db}`;
+    if(!unlocked.has(cell)&&flags.every(f=>unlocked.has(f))){
+      unlocked.add(cell);
+      newlyUnlocked.push({unlock:cell,label});
+    }
+  });
+  // Derive aleatorio-libre unlocks
+  const aleLibLevels=[
+    {db:"facil",   flags:["_alelib_img_ok","_alelib_nom_ok","_alelib_snd_ok"],         label:"Aleatorio Sin Opciones 🟢 Fácil"},
+    {db:"medio",   flags:["_alelib_img_med_ok","_alelib_nom_med_ok","_alelib_snd_med_ok"],label:"Aleatorio Sin Opciones 🔵 Medio"},
+    {db:"dificil", flags:["_alelib_img_dif_ok","_alelib_nom_dif_ok","_alelib_snd_dif_ok"],label:"Aleatorio Sin Opciones 🔴 Difícil"},
+    {db:"experto", flags:["_alelib_img_exp_ok","_alelib_nom_exp_ok","_alelib_snd_exp_ok"],label:"Aleatorio Sin Opciones 🟣 Experto"},
+  ];
+  aleLibLevels.forEach(({db,flags,label})=>{
+    const cell=`aleatorio-libre_${db}`;
+    if(!unlocked.has(cell)&&flags.every(f=>unlocked.has(f))){
+      unlocked.add(cell);
+      newlyUnlocked.push({unlock:cell,label});
+    }
+  });
+  if(unlocked.size>sizeBefore) saveUnlocked(unlocked);
+  return newlyUnlocked;
+}
+
+// ══════════════════════════════════════════
+//  PROGRESS — FIXED: average per sub-mode across all dbs
+// ══════════════════════════════════════════
+function getRecords(){return JSON.parse(localStorage.getItem("avesRecords5")||"{}");}
+function saveRecords(r){localStorage.setItem("avesRecords5",JSON.stringify(r));}
+
+function getBestPct(modeKey){
+  const r=getRecords()[modeKey];
+  if(!r||r.bestScore===undefined)return 0;
+  const parts=modeKey.split("_");
+  const db=parts[parts.length-1];
+  const total=databases[db]?.length||1;
+  return Math.round(r.bestScore/total*100);
+}
+
+// Group progress = AVERAGE (floor) of best% across cells
+function getGroupPct(cells){
+  if(!cells||cells.length===0)return 0;
+  const vals=cells.map(c=>getBestPct(c));
+  return Math.floor(vals.reduce((a,b)=>a+b,0)/vals.length);
+}
+
+// Sub-mode progress = AVERAGE (floor) across unlocked dbs for that mode
+function getSubModePct(mode){
+  const dbs=["facil","medio","dificil","experto"];
+  const unlocked=getUnlocked();
+  const cells=dbs.filter(db=>unlocked.has(`${mode}_${db}`));
+  if(cells.length===0)return 0;
+  const vals=cells.map(db=>getBestPct(`${mode}_${db}`));
+  return Math.floor(vals.reduce((a,b)=>a+b,0)/vals.length);
+}
+
+// All game mode × db combinations that can ever earn a star
+const ALL_GAME_MODES=["imagen","imagen-libre","nombre","nombre-sonido","sonido","sonido-libre","aleatorio-opc","aleatorio-libre"];
+const ALL_DBS=["facil","medio","dificil","experto"];
+// Total stars = all mode×db combos (excluding flag-only cells)
+// 8 modes × 4 dbs = 32 stars total
+const TOTAL_STARS=ALL_GAME_MODES.length*ALL_DBS.length; // 32
+
+// Overall progress = average across ALL cells (unlocked or not), treating locked/unplayed as 0%
+function getOverallPct(){
+  let sum=0,count=0;
+  ALL_GAME_MODES.forEach(m=>{
+    ALL_DBS.forEach(db=>{
+      sum+=getBestPct(`${m}_${db}`);
+      count++;
+    });
+  });
+  if(count===0)return 0;
+  return Math.floor(sum/count);
+}
+
+// Count earned stars across ALL cells (not just unlocked)
+function countStars(){
+  const r=getRecords();
+  let earned=0;
+  ALL_GAME_MODES.forEach(m=>{
+    ALL_DBS.forEach(db=>{
+      const rk=r[`${m}_${db}`];
+      if(rk&&rk.bestScore!==undefined){
+        const total=databases[db]?.length||1;
+        if(rk.bestScore>=total) earned++;
+      }
+    });
+  });
+  return earned;
+}
+
+function pctClass(pct){return pct>=70?"p-high":pct>=50?"p-mid":"p-low";}
+function pctLabel(pct){return pct>=70?"green":pct>=50?"orange":"";}
+
+// ══════════════════════════════════════════
+//  RECORDS MODAL
+// ══════════════════════════════════════════
+function openRecordsModal(){
+  const r=getRecords();
+  const overall=getOverallPct();
+  const allGameModes=ALL_GAME_MODES;
+  const allDbs=ALL_DBS;
+  const starCount=countStars();
+  const starTotal=TOTAL_STARS;
+  document.getElementById("rm-rank-line").textContent=`Rango: ${getRankLabel(overall)} · ${overall}% · ⭐ ${starCount}/${starTotal}`;
+  const modeGroups=[
+    {title:"🖼️ Por Imagen",modes:[["imagen","Opciones"],["imagen-libre","Escribir"]]},
+    {title:"🔤 Por Nombre",modes:[["nombre","Imagen"],["nombre-sonido","Sonido"]]},
+    {title:"🎧 Por Sonido",modes:[["sonido","Opciones"],["sonido-libre","Escribir"]]},
+    {title:"🎲 Aleatorio — Con Opciones",modes:[["aleatorio-opc","Con Opciones"]]},
+    {title:"🎲 Aleatorio — Sin Opciones",modes:[["aleatorio-libre","Sin Opciones"]]},
+  ];
+  const dbDefs=[{key:"facil",emoji:"🟢"},{key:"medio",emoji:"🔵"},{key:"dificil",emoji:"🔴"},{key:"experto",emoji:"🟣"}];
+  let html="";
+  modeGroups.forEach(({title,modes})=>{
+    html+=`<div class="rm-section-title">${title}</div>`;
+    modes.forEach(([modeKey,modeName])=>{
+      dbDefs.forEach(({key,emoji})=>{
+        const cell=`${modeKey}_${key}`;
+        const unlocked=isUnlocked(cell);
+        const rk=r[cell];
+        const total=databases[key].length;
+        const label=`${modeName} ${emoji}`;
+        if(!unlocked){
+          // Show specific hint for aleatorio modes
+          let hint;
+          if(modeKey==="aleatorio-opc") hint=`${ALE_OPC_HINT} ${emoji}`;
+          else if(modeKey==="aleatorio-libre") hint=`${ALE_LIB_HINT} ${emoji}`;
+          else hint=UNLOCK_HINTS[cell]||"Bloqueado";
+          html+=`<div class="rm-row"><span class="rm-mode">${label} 🔒</span><span class="rm-val zero" style="font-size:10px;color:#ccc">${hint}</span></div>`;
+        } else if(!rk||rk.bestScore===undefined){
+          html+=`<div class="rm-row"><span class="rm-mode">${label}</span><span class="rm-val zero">Sin jugar</span></div>`;
+        } else {
+          const pct=Math.round(rk.bestScore/total*100);
+          const star=pct===100?"⭐ ":"";
+          const pcls=pctLabel(pct);
+          const time=rk.bestTime!==undefined?` · ⏱ ${formatTime(rk.bestTime)}`:"";
+          html+=`<div class="rm-row"><span class="rm-mode">${label}</span><span class="rm-val">${star}${rk.bestScore}/${total}<span class="rm-pct${pcls?" "+pcls:""}"> ${pct}%</span>${time}</span></div>`;
+        }
+      });
+    });
+  });
+  document.getElementById("rm-content").innerHTML=html;
+  document.getElementById("records-modal").classList.add("open");
+}
+function closeRecordsModal(e){
+  if(!e||e.target===document.getElementById("records-modal")){
+    document.getElementById("records-modal").classList.remove("open");
+  }
+}
+
+// ══════════════════════════════════════════
+//  MENU RENDERING — FIXED progress display
+// ══════════════════════════════════════════
+const SUB_BTN_MAP={"imagen":"sub-imagen-opciones","imagen-libre":"sub-imagen-libre","nombre":"sub-nombre-imagen","nombre-sonido":"sub-nombre-sonido","sonido":"sub-sonido-opciones","sonido-libre":"sub-sonido-libre","aleatorio-opc":"sub-aleatorio-opc","aleatorio-libre":"sub-aleatorio-libre"};
+const SUB_PROG_MAP={"imagen":"sp-imagen-opciones","imagen-libre":"sp-imagen-libre","nombre":"sp-nombre-imagen","nombre-sonido":"sp-nombre-sonido","sonido":"sp-sonido-opciones","sonido-libre":"sp-sonido-libre","aleatorio-opc":"sp-aleatorio-opc","aleatorio-libre":"sp-aleatorio-libre"};
+const SUB_LT_MAP={"imagen":"lt-imagen-opciones","imagen-libre":"lt-imagen-libre","nombre":"lt-nombre-imagen","nombre-sonido":"lt-nombre-sonido","sonido":"lt-sonido-opciones","sonido-libre":"lt-sonido-libre","aleatorio-opc":"lt-aleatorio-opc","aleatorio-libre":"lt-aleatorio-libre"};
+const GROUP_MODES={"imagen":["imagen","imagen-libre"],"nombre":["nombre","nombre-sonido"],"sonido":["sonido","sonido-libre"],"aleatorio":["aleatorio-opc","aleatorio-libre"]};
+
+function renderMenu(){
+  const unlocked=getUnlocked();
+  const dbs=["facil","medio","dificil","experto"];
+
+  Object.entries(SUB_BTN_MAP).forEach(([mode,btnId])=>{
+    const btn=document.getElementById(btnId);
+    const prog=document.getElementById(SUB_PROG_MAP[mode]);
+    const lt=document.getElementById(SUB_LT_MAP[mode]);
+    const unlockedDbs=dbs.filter(db=>unlocked.has(`${mode}_${db}`));
+    const isAny=unlockedDbs.length>0;
+    if(!isAny){
+      btn.classList.add("sub-locked");btn.disabled=true;
+      if(prog){prog.textContent="🔒";prog.className="sub-progress locked-text";}
+      // Special hints for aleatorio sub-modes
+      if(mode==="aleatorio-opc"){
+        if(lt) lt.textContent="Necesitás 40% en Imagen-Opc, Nombre-Img y Sonido-Opc 🟢";
+      } else if(mode==="aleatorio-libre"){
+        if(lt) lt.textContent="Necesitás 40% en Imagen-Esc, Nombre-Snd y Sonido-Esc 🟢";
+      } else {
+        const firstRule=UNLOCK_RULES.find(r=>dbs.some(db=>r.unlock===`${mode}_${db}`));
+        if(lt&&firstRule){
+          const parts=firstRule.from.split("_");
+          const db=parts[parts.length-1];
+          const m=parts.slice(0,parts.length-1).join("_");
+          const dbN={facil:"🟢 Fácil",medio:"🔵 Medio",dificil:"🔴 Difícil",experto:"🟣 Experto"};
+          const mN={"imagen":"Imagen-Opc","imagen-libre":"Imagen-Esc","nombre":"Nombre-Img","nombre-sonido":"Nombre-Snd","sonido":"Sonido-Opc","sonido-libre":"Sonido-Esc"};
+          lt.textContent=`Necesitás ${firstRule.pct}% en ${mN[m]||m} ${dbN[db]||db}`;
+        }
+      }
+    } else {
+      btn.classList.remove("sub-locked");btn.disabled=false;
+      if(lt)lt.textContent="";
+      // FIXED: use average across all unlocked dbs, not max
+      const avgPct=getSubModePct(mode);
+      if(prog){
+        const star=avgPct===100?" ⭐":"";
+        prog.textContent=`${avgPct}%${star}`;
+        prog.className="sub-progress "+pctClass(avgPct);
+      }
+    }
+  });
+
+  Object.entries(GROUP_MODES).forEach(([gk,modes])=>{
+    const groupEl=document.getElementById(`group-${gk}`);
+    const gpEl=document.getElementById(`gp-${gk}`);
+    const cells=[];
+    modes.forEach(m=>dbs.forEach(db=>{if(unlocked.has(`${m}_${db}`))cells.push(`${m}_${db}`);}));
+    if(cells.length===0){
+      groupEl.classList.add("locked");
+      if(gpEl)gpEl.innerHTML=`<span style="color:#bbb;font-size:11px">🔒 Bloqueado</span>`;
+    } else {
+      groupEl.classList.remove("locked");
+      // FIXED: average across all cells in group
+      const avgPct=getGroupPct(cells);
+      const star=avgPct===100?" ⭐":"";
+      const cls=pctLabel(avgPct);
+      if(gpEl)gpEl.innerHTML=`<span class="gp-pct${cls?" "+cls:""}">Progreso ${avgPct}%${star}</span>`;
+    }
+  });
+
+  const overall=getOverallPct();
+  const ovLabel=document.getElementById("overall-pct-label");
+  const ovBar=document.getElementById("overall-bar");
+  const rankLabel=document.getElementById("rank-title-label");
+  const oStar=overall===100?" ⭐":"";
+  const oCls=pctLabel(overall);
+  ovLabel.textContent=`${overall}%${oStar}`;
+  ovLabel.className="pct"+(oCls?" "+oCls:"");
+  ovBar.style.width=overall+"%";
+  ovBar.className="bar-inner"+(oCls?" "+oCls:"");
+  if(rankLabel)rankLabel.textContent=`— ${getRankLabel(overall)}`;
+
+  // Star counter
+  const earned=countStars();
+  const starEl=document.getElementById("star-counter");
+  if(starEl) starEl.textContent=`⭐ ${earned}/${TOTAL_STARS}`;
+
+  // Secret card: unlock at 100% overall
+  const secretCard=document.getElementById("secret-card");
+  if(secretCard){
+    const isUnlockedSecret=overall>=100;
+    secretCard.classList.toggle("unlocked",isUnlockedSecret);
+    const icon=document.getElementById("secret-icon");
+    const desc=document.getElementById("secret-desc");
+    if(icon) icon.textContent=isUnlockedSecret?"🎉":"🔒";
+    if(desc) desc.textContent=isUnlockedSecret?"¡Felicitaciones! Hacé clic para leer tu mensaje.":"Completá el 100% del juego para desbloquearlo.";
+    secretCard.onclick=isUnlockedSecret?()=>{sfx.click();openSecretLevel();}:null;
+    secretCard.style.cursor=isUnlockedSecret?"pointer":"default";
+  }
+}
+
+function openSecretLevel(){showScreen("secret-screen");}
+
+function renderMenuRecords(){
+  const el=document.getElementById("menu-records");
+  if(!el) return; // element was removed from menu
+  const r=getRecords();
+  const modes=[["imagen","🖼️ Img-Opc"],["imagen-libre","✏️ Img-Esc"],["nombre","🔤 Nom-Img"],["nombre-sonido","🔊 Nom-Snd"],["sonido","🎧 Snd-Opc"],["sonido-libre","🎤 Snd-Esc"],["aleatorio-opc","🎲 Ale-Opc"],["aleatorio-libre","🎲 Ale-Lib"]];
+  const lines=[];
+  modes.forEach(([key,label])=>{
+    ["facil","medio","dificil","experto"].forEach(db=>{
+      const rk=r[`${key}_${db}`];
+      if(rk?.bestScore!==undefined){
+        const total=databases[db].length;
+        const emoji=db==="facil"?"🟢":db==="medio"?"🔵":db==="dificil"?"🔴":"🟣";
+        lines.push(`${label} ${emoji} — <strong>${rk.bestScore}/${total}</strong>`+(rk.bestTime!==undefined?` · <strong>${formatTime(rk.bestTime)}</strong>`:""));
+      }
+    });
+  });
+  el.innerHTML=lines.join("<br>");
+}
+
+// ══════════════════════════════════════════
+//  UI SOUNDS
+// ══════════════════════════════════════════
+const AudioCtx=window.AudioContext||window.webkitAudioContext;
+let _ctx=null;
+function getCtx(){if(!_ctx)_ctx=new AudioCtx();return _ctx;}
+const sfx={
+  _g(base){ return sfxMuted?0:base*sfxVolume*2; }, // scale base gain by sfxVolume
+  click(){if(sfxMuted)return;const ctx=getCtx(),o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type="sine";o.frequency.setValueAtTime(600,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(500,ctx.currentTime+0.06);g.gain.setValueAtTime(this._g(0.09),ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.08);o.start();o.stop(ctx.currentTime+0.08);},
+  correct(){if(sfxMuted)return;const ctx=getCtx(),now=ctx.currentTime,vol=this._g(0.125);[[523,0],[659,0.08],[784,0.16]].forEach(([f,d])=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type="triangle";o.frequency.value=f;g.gain.setValueAtTime(0,now+d);g.gain.linearRampToValueAtTime(vol,now+d+0.02);g.gain.exponentialRampToValueAtTime(0.001,now+d+0.3);o.start(now+d);o.stop(now+d+0.32);});},
+  wrong(){if(sfxMuted)return;const ctx=getCtx(),now=ctx.currentTime,vol=this._g(0.11);[[280,0],[220,0.12]].forEach(([f,d])=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type="sawtooth";o.frequency.setValueAtTime(f,now+d);o.frequency.exponentialRampToValueAtTime(f*0.85,now+d+0.18);g.gain.setValueAtTime(vol,now+d);g.gain.exponentialRampToValueAtTime(0.001,now+d+0.22);o.start(now+d);o.stop(now+d+0.24);});},
+  finish(){if(sfxMuted)return;const ctx=getCtx(),now=ctx.currentTime,vol=this._g(0.14);[[392,0],[392,0.12],[392,0.24],[523,0.36],[659,0.54]].forEach(([f,d])=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type="triangle";o.frequency.value=f;g.gain.setValueAtTime(0,now+d);g.gain.linearRampToValueAtTime(vol,now+d+0.03);g.gain.exponentialRampToValueAtTime(0.001,now+d+0.22);o.start(now+d);o.stop(now+d+0.25);});},
+  record(){if(sfxMuted)return;const ctx=getCtx(),now=ctx.currentTime,vol=this._g(0.15);[[523,0],[659,0.1],[784,0.2],[1047,0.32],[784,0.48],[880,0.58],[1047,0.7]].forEach(([f,d])=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type="triangle";o.frequency.value=f;g.gain.setValueAtTime(0,now+d);g.gain.linearRampToValueAtTime(vol,now+d+0.03);g.gain.exponentialRampToValueAtTime(0.001,now+d+0.28);o.start(now+d);o.stop(now+d+0.3);});const p=ctx.createOscillator(),pg=ctx.createGain();p.connect(pg);pg.connect(ctx.destination);p.type="sine";p.frequency.value=523;pg.gain.setValueAtTime(0,now);pg.gain.linearRampToValueAtTime(this._g(0.04),now+0.1);pg.gain.linearRampToValueAtTime(this._g(0.04),now+0.8);pg.gain.exponentialRampToValueAtTime(0.001,now+1.1);p.start(now);p.stop(now+1.15);},
+  unlock(){if(sfxMuted)return;const ctx=getCtx(),now=ctx.currentTime,vol=this._g(0.15);[[523,0,0.15],[659,0.18,0.15],[784,0.36,0.15],[1047,0.56,0.4]].forEach(([f,d,dur])=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type="triangle";o.frequency.value=f;g.gain.setValueAtTime(0,now+d);g.gain.linearRampToValueAtTime(vol,now+d+0.03);g.gain.exponentialRampToValueAtTime(0.001,now+d+dur);o.start(now+d);o.stop(now+d+dur+0.01);});},
+  memo(){if(sfxMuted)return;const ctx=getCtx(),now=ctx.currentTime,vol=this._g(0.1);[[784,0,0.1],[880,0.12,0.1],[1047,0.25,0.25]].forEach(([f,d,dur])=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type="sine";o.frequency.value=f;g.gain.setValueAtTime(0,now+d);g.gain.linearRampToValueAtTime(vol,now+d+0.02);g.gain.exponentialRampToValueAtTime(0.001,now+d+dur);o.start(now+d);o.stop(now+d+dur+0.01);})}
+};
+
+// ══════════════════════════════════════════
+//  MUSIC & AUDIO SETTINGS
+// ══════════════════════════════════════════
+let menuAudio=null;
+let musicVolume=0.5;   // default 50%
+let birdVolume=0.5;    // default 50%
+let sfxVolume=0.5;     // default 50%
+let musicMuted=false;
+let birdMuted=false;
+let sfxMuted=false;
+const MUSIC_BASE="sonidos/musicamenu";
+const MUSIC_MAX=10;
+
+function startMenuMusic(){
+  if(menuAudio) return; // already playing — never restart
+  const n=Math.floor(Math.random()*MUSIC_MAX)+1;
+  const src=`${MUSIC_BASE}${n}.mp3`;
+  const audio=new Audio(src);
+  audio.loop=true;
+  audio.volume=musicMuted?0:musicVolume;
+  menuAudio=audio;
+  audio.play().catch(()=>{
+    menuAudio=null;
+    // try next index
+    const n2=(n%MUSIC_MAX)+1;
+    const audio2=new Audio(`${MUSIC_BASE}${n2}.mp3`);
+    audio2.loop=true;audio2.volume=musicMuted?0:musicVolume;
+    menuAudio=audio2;
+    audio2.play().catch(()=>{menuAudio=null;});
+  });
+}
+
+function duckMusic(){
+  if(!menuAudio||musicMuted) return;
+  const target=musicVolume*0.18; // drop to 18% while playing
+  let v=menuAudio.volume;
+  const step=setInterval(()=>{
+    v=Math.max(target,v-0.025);
+    try{menuAudio.volume=v;}catch(e){}
+    if(v<=target)clearInterval(step);
+  },50);
+}
+
+function unduckMusic(){
+  if(!menuAudio||musicMuted) return;
+  const target=musicVolume;
+  let v=menuAudio.volume;
+  const step=setInterval(()=>{
+    v=Math.min(target,v+0.03);
+    try{menuAudio.volume=v;}catch(e){}
+    if(v>=target)clearInterval(step);
+  },60);
+}
+
+// Legacy compatibility shim — no longer stops music, just ducks
+function stopMenuMusic(fade){
+  if(fade) duckMusic(); // duck instead of stop
+}
+
+function toggleMusic(){
+  // Opens the volume panel instead of just toggling
+  openVolumePanel();
+}
+
+function setMusicVolume(v){
+  musicVolume=v;
+  if(menuAudio && !musicMuted) menuAudio.volume=v;
+}
+function setBirdVolume(v){
+  birdVolume=v;
+}
+function toggleMusicMute(){
+  musicMuted=!musicMuted;
+  if(menuAudio) menuAudio.volume=musicMuted?0:musicVolume;
+  document.getElementById("music-mute-btn").textContent=musicMuted?"🔕":"🔊";
+  document.getElementById("music-mute-btn").style.background=musicMuted?"#fdecea":"";
+}
+function toggleBirdMute(){
+  birdMuted=!birdMuted;
+  if(birdMuted && currentAudio) currentAudio.volume=0;
+  document.getElementById("bird-mute-btn").textContent=birdMuted?"🔕":"🔊";
+  document.getElementById("bird-mute-btn").style.background=birdMuted?"#fdecea":"";
+}
+function setSfxVolume(v){ sfxVolume=v; }
+function toggleSfxMute(){
+  sfxMuted=!sfxMuted;
+  document.getElementById("sfx-mute-btn").textContent=sfxMuted?"🔕":"🔊";
+  document.getElementById("sfx-mute-btn").style.background=sfxMuted?"#fdecea":"";
+}
+function openVolumePanel(){
+  document.getElementById("volume-panel").classList.toggle("open");
+}
+function closeVolumePanel(){
+  document.getElementById("volume-panel").classList.remove("open");
+}
+
+// ══════════════════════════════════════════
+//  BIRD AUDIO
+// ══════════════════════════════════════════
+let currentAudio=null,currentAudioBtn=null,currentAudioSrc=null,currentSndOptionBtn=null;
+function stopBirdAudio(){if(currentAudio){currentAudio.pause();currentAudio.currentTime=0;currentAudio=null;}if(currentAudioBtn){currentAudioBtn.classList.remove("playing");currentAudioBtn=null;}if(currentSndOptionBtn){currentSndOptionBtn.classList.remove("playing-now");currentSndOptionBtn=null;}currentAudioSrc=null;}
+function getSoundFile(imagePath){const filename=imagePath.split("/").pop().replace(/\.[^.]+$/,"");const dir=imagePath.includes("/facil/")||imagePath.includes("/medio/")?"sonidos/facil/":"sonidos/";return `${dir}${filename}.mp3`;}
+function playAudioSrc(src,btn,isSndOpt=false){
+  if(currentAudio&&currentAudioSrc===src){stopBirdAudio();unduckMusic();return;}
+  stopBirdAudio();
+  duckMusic(); // duck music instead of stopping
+  const audio=new Audio(src);currentAudio=audio;currentAudioSrc=src;
+  audio.volume=birdMuted?0:birdVolume;
+  if(isSndOpt){currentSndOptionBtn=btn;if(btn)btn.classList.add("playing-now");}
+  else{currentAudioBtn=btn;if(btn)btn.classList.add("playing");}
+  audio.play().catch(()=>{if(isSndOpt){if(btn)btn.classList.remove("playing-now");}else if(btn)btn.classList.remove("playing");currentAudio=null;unduckMusic();});
+  audio.onended=()=>{
+    if(isSndOpt){if(btn)btn.classList.remove("playing-now");}else if(btn)btn.classList.remove("playing");
+    currentAudio=null;currentAudioBtn=null;currentSndOptionBtn=null;currentAudioSrc=null;
+    unduckMusic();
+  };
+}
+function toggleBirdSound(mode){
+  if(!currentQuestion)return;
+  const ids={"imagen":"sound-btn-imagen","imagen-libre":"sound-btn-imagen-libre","nombre":"sound-btn-nombre","sonido":"play-big-btn","sonido-libre":"play-big-btn-libre"};
+  playAudioSrc(getSoundFile(currentQuestion.image),document.getElementById(ids[mode]));
+}
+function toggleGuideSound(src,btn){playAudioSrc(src,btn);}
+function playSndOption(src,btn){playAudioSrc(src,btn,true);}
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let currentMode="imagen",currentDb="facil";
+let database=databases.facil,pendingMode=null;
+let queue=[],currentQuestion=null,questionIndex=0,score=0;
+let failedOnce=false,writeAttempted=false;
+let timerInterval=null,elapsedSeconds=0;
+// For aleatorio mode: track which sub-mode is used per question
+let aleatorioSubModes=["imagen","nombre","sonido"];
+
+// Auto-play sound setting
+let autoPlayEnabled=false;
+function toggleAutoPlay(){
+  autoPlayEnabled=!autoPlayEnabled;
+  const btn=document.getElementById("autoplay-btn");
+  if(btn){
+    btn.textContent=`🔊 Auto: ${autoPlayEnabled?"ON":"OFF"}`;
+    btn.style.background=autoPlayEnabled?"#d0ecd0":"#f5fbf5";
+    btn.style.borderColor=autoPlayEnabled?"#3a8a3a":"#b0d0b0";
+    btn.style.fontWeight=autoPlayEnabled?"bold":"normal";
+  }
+}
+
+function shuffle(arr){return [...arr].sort(()=>Math.random()-0.5);}
+function formatTime(s){const m=Math.floor(s/60);return `${m}:${(s%60).toString().padStart(2,"0")}`;}
+function normalize(str){return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9\s]/g,"").replace(/\s+/g," ").trim();}
+
+let toastTimeout=null;
+function showToast(msg,dur=3400){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>t.classList.remove("show"),dur);}
+
+function startTimer(){elapsedSeconds=0;clearInterval(timerInterval);timerInterval=setInterval(()=>{elapsedSeconds++;document.getElementById("timer-display").textContent="⏱ "+formatTime(elapsedSeconds);},1000);}
+function stopTimer(){clearInterval(timerInterval);}
+
+// ══════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════
+function showScreen(id){stopBirdAudio();document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));document.getElementById(id).classList.add("active");}
+
+function goMenu(){
+  stopTimer();
+  renderMenu();
+  showScreen("menu-screen");
+  // Keep music playing (just restore volume if it was ducked)
+  if(menuAudio && !musicMuted){
+    const targetVol=musicVolume;
+    let v=menuAudio.volume;
+    const step=setInterval(()=>{
+      v=Math.min(targetVol,v+0.03);
+      try{menuAudio.volume=v;}catch(e){}
+      if(v>=targetVol)clearInterval(step);
+    },60);
+  }
+  if(!menuAudio) startMenuMusic();
+}
+
+function selectMode(mode){
+  const dbs=["facil","medio","dificil","experto"];
+  const availDbs=dbs.filter(db=>isUnlocked(`${mode}_${db}`));
+  if(availDbs.length===0){showToast("🔒 Este modo está bloqueado");return;}
+  pendingMode=mode;
+  const labels={"imagen":"🖼️ Por Imagen — Opciones","imagen-libre":"✏️ Por Imagen — Escribir","nombre":"🔤 Por Nombre — Imagen","nombre-sonido":"🔊 Por Nombre — Sonido","sonido":"🎧 Por Sonido — Opciones","sonido-libre":"🎤 Por Sonido — Escribir","aleatorio-opc":"🎲 Aleatorio — Con Opciones","aleatorio-libre":"🎲 Aleatorio — Sin Opciones"};
+  document.getElementById("db-mode-label").textContent=`Modo: ${labels[mode]||mode}`;
+  const container=document.getElementById("db-cards-container");
+  container.innerHTML="";
+  const dbDefs=[
+    {key:"facil",   badgeClass:"badge-easy",   emoji:"🟢",title:"Aves Muy Comunes",  desc:"Benteveo, Hornero, Gorrión, Calandria y otras aves del día a día."},
+    {key:"medio",   badgeClass:"badge-medium",  emoji:"🔵",title:"Aves Conocidas",    desc:"Carancho, Cotorra, Lechuza viscachera, patos y otras aves reconocibles."},
+    {key:"dificil", badgeClass:"badge-hard",    emoji:"🔴",title:"Aves Desafiantes",  desc:"Sirirí pampa, Atajacaminos, Hocó colorado y otras especies poco conocidas."},
+    {key:"experto", badgeClass:"badge-expert",  emoji:"🟣",title:"Experto — Todas las aves",desc:`¡Las ${databases.experto.length} aves juntas! Necesitás 70% en Difícil del mismo modo.`},
+  ];
+  dbDefs.forEach(({key,badgeClass,emoji,title,desc})=>{
+    const locked=!isUnlocked(`${mode}_${key}`);
+    const pct=getBestPct(`${mode}_${key}`);
+    const star=pct===100?" ⭐":"";
+    const pCls=pctClass(pct);
+    const rk=getRecords()[`${mode}_${key}`];
+    const timeStr=(!locked&&rk?.bestTime!==undefined)?` · ⏱ ${formatTime(rk.bestTime)}`:"";
+    const hint=locked?(mode==="aleatorio-opc"?"Necesitás 40% en Imagen-Opc, Nombre-Img y Sonido-Opc del mismo nivel":mode==="aleatorio-libre"?"Necesitás 40% en Imagen-Esc, Nombre-Snd y Sonido-Esc del mismo nivel":(UNLOCK_HINTS[`${mode}_${key}`]||"")):"";
+    const card=document.createElement("div");
+    card.className="db-card"+(locked?" db-locked":"");
+    card.innerHTML=`
+      <div class="db-card-badge ${locked?"badge-lock":badgeClass}">${locked?"🔒 Bloqueado":`${emoji} ${key.charAt(0).toUpperCase()+key.slice(1)}`}</div>
+      <div class="db-card-title">${title}</div>
+      <div class="db-card-desc">${desc}</div>
+      <div class="db-card-meta">${databases[key].length} aves · Progreso: ${locked?'<span style="color:#bbb">🔒 Nivel bloqueado</span>':`<span class="${pCls}" style="font-weight:bold">${pct}%${star}</span>${timeStr}`}</div>
+      ${locked&&hint?`<div class="db-lock-hint">📌 ${hint}</div>`:""}
+    `;
+    if(!locked)card.onclick=()=>{sfx.click();startGame(mode,key);};
+    container.appendChild(card);
+  });
+  duckMusic();
+  showScreen("db-screen");
+}
+
+// ══════════════════════════════════════════
+//  GUIDE
+// ══════════════════════════════════════════
+let guideActiveFilter="todos";
+function openGuide(){duckMusic();guideActiveFilter="todos";buildGuideFilters();renderGuide();showScreen("guide-screen");}
+function buildGuideFilters(){
+  const container=document.getElementById("guide-filters");container.innerHTML="";
+  const filters=["todos","Por nivel","A–Z",...ALL_CATS];
+  filters.forEach(f=>{
+    const btn=document.createElement("button");
+    btn.className="filter-btn"+(f===guideActiveFilter?" active":"");
+    btn.textContent=f==="todos"?"🦜 Todas":f==="Por nivel"?"📊 Por nivel":f==="A–Z"?"🔤 A–Z":f;
+    btn.onclick=()=>{guideActiveFilter=f;document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");renderGuide();};
+    container.appendChild(btn);
+  });
+}
+function renderGuide(){
+  const list=document.getElementById("guide-list");list.innerHTML="";
+  const f=guideActiveFilter;
+  let birds=allBirds;
+  if(f!=="todos"&&f!=="Por nivel"&&f!=="A–Z")birds=allBirds.filter(b=>b.cat.includes(f));
+  if(f==="A–Z"){
+    [...birds].sort((a,b)=>a.name.localeCompare(b.name,"es")).forEach(b=>list.appendChild(makeGuideCard(b,true)));
+  } else if(f==="Por nivel"||f==="todos"){
+    [{label:"🟢 Fácil — Aves Muy Comunes",lvl:"facil"},{label:"🔵 Medio — Aves Conocidas",lvl:"medio"},{label:"🔴 Difícil — Aves Desafiantes",lvl:"dificil"}].forEach(({label,lvl})=>{
+      const lb=birds.filter(b=>b.level===lvl);if(!lb.length)return;
+      const title=document.createElement("div");title.className="guide-section-title";title.textContent=label;list.appendChild(title);
+      lb.forEach(b=>list.appendChild(makeGuideCard(b,false)));
+    });
+  } else {
+    [...birds].sort((a,b)=>{const lo={facil:0,medio:1,dificil:2};return(lo[a.level]||0)-(lo[b.level]||0)||a.name.localeCompare(b.name,"es");}).forEach(b=>list.appendChild(makeGuideCard(b,true)));
+  }
+  if(!list.children.length)list.innerHTML=`<p style="color:#aaa;text-align:center;padding:20px">No hay aves en esta categoría.</p>`;
+}
+function makeGuideCard(item,showLevel){
+  const soundSrc=getSoundFile(item.image);
+  const lvlEmoji={facil:"🟢",medio:"🔵",dificil:"🔴"}[item.level]||"";
+  const card=document.createElement("div");card.className="guide-card";
+  const tagsHtml=(item.cat||[]).map(c=>`<span class="guide-tag">${c}</span>`).join("");
+  card.innerHTML=`<div class="guide-img-wrap"><img src="${item.image}" alt="${item.name}" loading="lazy"></div><div class="guide-info"><div class="guide-name">${item.name}${showLevel&&lvlEmoji?` <span style="font-size:10px">${lvlEmoji}</span>`:""}</div><div class="guide-obra">${item.obra}</div><div class="guide-tags">${tagsHtml}</div></div><button class="sound-btn guide-sound-btn" title="Escuchar/detener">🔊</button>`;
+  card.querySelector(".guide-sound-btn").addEventListener("click",function(){toggleGuideSound(soundSrc,this);});
+  return card;
+}
+
+// ══════════════════════════════════════════
+//  GAME
+// ══════════════════════════════════════════
+function startGame(mode,dbKey){
+  currentMode=mode;currentDb=dbKey;
+  database=databases[dbKey];
+  queue=shuffle(database);
+  questionIndex=0;score=0;
+  const titles={"imagen":"🖼️ Por Imagen — Opciones","imagen-libre":"✏️ Por Imagen — Escribir","nombre":"🔤 Por Nombre — Imagen","nombre-sonido":"🔊 Por Nombre — Sonido","sonido":"🎧 Por Sonido — Opciones","sonido-libre":"🎤 Por Sonido — Escribir","aleatorio-opc":"🎲 Aleatorio — Con Opciones","aleatorio-libre":"🎲 Aleatorio — Sin Opciones"};
+  const dbBadge=dbKey==="facil"?"🟢":dbKey==="medio"?"🔵":dbKey==="dificil"?"🔴":"🟣";
+  document.getElementById("game-title").textContent=`${titles[mode]||mode}  ${dbBadge}`;
+  // Reset autoplay button display
+  const ab=document.getElementById("autoplay-btn");
+  if(ab){ab.textContent=`🔊 Auto: ${autoPlayEnabled?"ON":"OFF"}`;ab.style.background=autoPlayEnabled?"#d0ecd0":"#f5fbf5";ab.style.borderColor=autoPlayEnabled?"#3a8a3a":"#b0d0b0";ab.style.fontWeight=autoPlayEnabled?"bold":"normal";}
+  const allModes=["imagen","imagen-libre","nombre","nombre-sonido","sonido","sonido-libre"];
+  allModes.forEach(m=>{document.getElementById("mode-"+m).style.display="none";});
+  duckMusic();
+  showScreen("game-screen");startTimer();loadQuestion();
+}
+
+// Aleatorio: pick a random sub-mode based on which type (opc or libre)
+function pickAleatorioSubMode(mode){
+  const poolOpc=["imagen","nombre","sonido"];
+  const poolLib=["imagen-libre","nombre-sonido","sonido-libre"];
+  const pool=mode==="aleatorio-libre"?poolLib:poolOpc;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+let currentAleatorioSub=null; // sub-mode for current aleatorio question
+
+function loadQuestion(){
+  if(questionIndex>=queue.length){endGame();return;}
+  failedOnce=false;writeAttempted=false;
+  currentQuestion=queue[questionIndex];
+  const total=queue.length;
+  document.getElementById("questionNum").textContent=questionIndex+1;
+  document.getElementById("score").textContent=score;
+  document.getElementById("result").textContent="";
+  document.getElementById("progress-bar").style.width=(questionIndex/total*100)+"%";
+  document.getElementById("progress-label").textContent=`${questionIndex} de ${total} respondidas`;
+  const allModes=["imagen","imagen-libre","nombre","nombre-sonido","sonido","sonido-libre"];
+  allModes.forEach(m=>{document.getElementById("mode-"+m).style.display="none";});
+
+  let activeMode=currentMode;
+  if(currentMode==="aleatorio-opc"||currentMode==="aleatorio-libre"){
+    currentAleatorioSub=pickAleatorioSubMode(currentMode);
+    activeMode=currentAleatorioSub;
+  }
+  document.getElementById("mode-"+activeMode).style.display="block";
+
+  if(activeMode==="imagen")loadImagenQuestion();
+  else if(activeMode==="imagen-libre")loadImagenLibreQuestion();
+  else if(activeMode==="nombre")loadNombreQuestion();
+  else if(activeMode==="nombre-sonido")loadNombreSonidoQuestion();
+  else if(activeMode==="sonido")loadSonidoQuestion();
+  else loadSonidoLibreQuestion();
+
+  // Auto-play: if enabled and mode is NOT already auto-playing sound, play now
+  if(autoPlayEnabled && activeMode!=="sonido" && activeMode!=="sonido-libre"){
+    const ids={"imagen":"sound-btn-imagen","imagen-libre":"sound-btn-imagen-libre","nombre":"sound-btn-nombre"};
+    const btnId=ids[activeMode];
+    setTimeout(()=>{
+      if(currentQuestion){
+        const src=getSoundFile(currentQuestion.image);
+        playAudioSrc(src, btnId?document.getElementById(btnId):null);
+      }
+    },350);
+  }
+}
+
+function loadImagenQuestion(){
+  document.getElementById("image").src=currentQuestion.image;
+  document.getElementById("obra-imagen").textContent=currentQuestion.obra;
+  const wrongs=shuffle(database.filter(i=>i.name!==currentQuestion.name).map(i=>i.name)).slice(0,3);
+  const opts=shuffle([currentQuestion.name,...wrongs]);
+  const div=document.getElementById("options-imagen");div.innerHTML="";
+  opts.forEach(opt=>{const btn=document.createElement("button");btn.textContent=opt;btn.onclick=()=>checkAnswer(opt===currentQuestion.name,btn,"imagen");div.appendChild(btn);});
+}
+function loadImagenLibreQuestion(){
+  document.getElementById("image-libre").src=currentQuestion.image;
+  document.getElementById("obra-imagen-libre").textContent=currentQuestion.obra;
+  const inp=document.getElementById("write-imagen-input");inp.value="";inp.disabled=false;
+  document.getElementById("write-imagen-btn").disabled=false;
+  const rev=document.getElementById("write-imagen-reveal");rev.classList.remove("visible");rev.innerHTML="";
+  setTimeout(()=>inp.focus(),80);
+  inp.onkeydown=e=>{if(e.key==="Enter")checkWriteAnswer("imagen-libre");};
+}
+function loadNombreQuestion(){
+  document.getElementById("nombre-prompt").textContent=currentQuestion.name;
+  document.getElementById("nombre-obra").textContent=currentQuestion.obra;
+  const wrongs=shuffle(database.filter(i=>i.image!==currentQuestion.image)).slice(0,3);
+  const opts=shuffle([currentQuestion,...wrongs]);
+  const div=document.getElementById("options-nombre");div.innerHTML="";
+  opts.forEach(item=>{const btn=document.createElement("button");btn.className="img-option";btn.innerHTML=`<img src="${item.image}" alt="${item.name}">`;btn.onclick=()=>checkAnswer(item.image===currentQuestion.image,btn,"nombre");div.appendChild(btn);});
+}
+function loadNombreSonidoQuestion(){
+  document.getElementById("nombre-sonido-prompt").textContent=currentQuestion.name;
+  document.getElementById("nombre-sonido-obra").textContent=currentQuestion.obra;
+  const wrongs=shuffle(database.filter(i=>i.image!==currentQuestion.image)).slice(0,3);
+  const opts=shuffle([currentQuestion,...wrongs]);
+  const div=document.getElementById("options-nombre-sonido");div.innerHTML="";
+  opts.forEach((item,idx)=>{
+    const soundSrc=getSoundFile(item.image);
+    const isCorrect=item.image===currentQuestion.image;
+    const btn=document.createElement("button");btn.className="snd-option";
+    btn.innerHTML=`<div class="snd-play">▶️</div><div class="snd-label">Canto ${idx+1}</div>`;
+    let hasPlayed=false;
+    btn.addEventListener("click",function(){
+      if(btn.disabled)return;
+      if(!hasPlayed){hasPlayed=true;playSndOption(soundSrc,btn);btn.style.outline="3px solid #3a8a3a";btn.addEventListener("click",function inner(){btn.removeEventListener("click",inner);btn.style.outline="";checkAnswer(isCorrect,btn,"nombre-sonido");},{once:true});}
+    });
+    div.appendChild(btn);
+  });
+}
+function loadSonidoQuestion(){
+  document.getElementById("sonido-reveal").classList.remove("visible");
+  document.getElementById("reveal-img").src="";document.getElementById("reveal-obra").textContent="";
+  const wrongs=shuffle(database.filter(i=>i.name!==currentQuestion.name).map(i=>i.name)).slice(0,3);
+  const opts=shuffle([currentQuestion.name,...wrongs]);
+  const div=document.getElementById("options-sonido");div.innerHTML="";
+  opts.forEach(opt=>{const btn=document.createElement("button");btn.textContent=opt;btn.onclick=()=>checkAnswer(opt===currentQuestion.name,btn,"sonido");div.appendChild(btn);});
+  document.getElementById("play-big-btn").disabled=false;
+  setTimeout(()=>toggleBirdSound("sonido"),400);
+}
+function loadSonidoLibreQuestion(){
+  document.getElementById("sonido-libre-reveal").classList.remove("visible");
+  document.getElementById("reveal-img-libre").src="";document.getElementById("reveal-obra-libre").textContent="";
+  const inp=document.getElementById("write-sonido-input");inp.value="";inp.disabled=false;
+  document.getElementById("write-sonido-btn").disabled=false;
+  const rev=document.getElementById("write-sonido-reveal");rev.classList.remove("visible");rev.innerHTML="";
+  document.getElementById("play-big-btn-libre").disabled=false;
+  setTimeout(()=>{inp.focus();toggleBirdSound("sonido-libre");},400);
+  inp.onkeydown=e=>{if(e.key==="Enter")checkWriteAnswer("sonido-libre");};
+}
+
+function checkWriteAnswer(mode){
+  const isImg=mode==="imagen-libre";
+  const inp=document.getElementById(isImg?"write-imagen-input":"write-sonido-input");
+  const typed=normalize(inp.value);if(!typed)return;
+  const isCorrect=typed===normalize(currentQuestion.name);
+  const resultEl=document.getElementById("result");
+  if(isCorrect){
+    if(!failedOnce){score++;document.getElementById("score").textContent=score;}
+    sfx.correct();inp.disabled=true;document.getElementById(isImg?"write-imagen-btn":"write-sonido-btn").disabled=true;
+    resultEl.textContent=failedOnce?"✅ Correcto (sin punto)":"✅ ¡Correcto!";
+    if(mode==="sonido-libre"){document.getElementById("reveal-img-libre").src=currentQuestion.image;document.getElementById("reveal-obra-libre").textContent=`${currentQuestion.name} · ${currentQuestion.obra}`;document.getElementById("sonido-libre-reveal").classList.add("visible");document.getElementById("play-big-btn-libre").disabled=true;}
+    const total=queue.length;document.getElementById("progress-bar").style.width=((questionIndex+1)/total*100)+"%";document.getElementById("progress-label").textContent=`${questionIndex+1} de ${total} respondidas`;
+    questionIndex++;setTimeout(loadQuestion,1800);
+  } else {
+    sfx.wrong();failedOnce=true;resultEl.textContent="❌ Incorrecto — intentá de nuevo";inp.value="";inp.focus();
+    if(!writeAttempted)writeAttempted=true;
+    else{const revEl=document.getElementById(isImg?"write-imagen-reveal":"write-sonido-reveal");revEl.innerHTML=`💡 La respuesta es: <strong>${currentQuestion.name}</strong>`;revEl.classList.add("visible");}
+  }
+}
+function checkAnswer(isCorrect,btn,mode){
+  const resultEl=document.getElementById("result");
+  const selMap={imagen:"#options-imagen button",nombre:"#options-nombre button","nombre-sonido":"#options-nombre-sonido button",sonido:"#options-sonido button"};
+  if(isCorrect){
+    if(!failedOnce){score++;document.getElementById("score").textContent=score;}
+    sfx.correct();btn.classList.add("correct");
+    resultEl.textContent=failedOnce?"✅ Correcto (sin punto)":"✅ ¡Correcto!";
+    stopBirdAudio();document.querySelectorAll(selMap[mode]).forEach(b=>{b.disabled=true;b.style.outline="";});
+    if(mode==="sonido"){document.getElementById("reveal-img").src=currentQuestion.image;document.getElementById("reveal-obra").textContent=`${currentQuestion.name} · ${currentQuestion.obra}`;document.getElementById("sonido-reveal").classList.add("visible");document.getElementById("play-big-btn").disabled=true;}
+    const total=queue.length;document.getElementById("progress-bar").style.width=((questionIndex+1)/total*100)+"%";document.getElementById("progress-label").textContent=`${questionIndex+1} de ${total} respondidas`;
+    questionIndex++;setTimeout(loadQuestion,1600);
+  } else {
+    failedOnce=true;sfx.wrong();btn.classList.add("wrong");btn.disabled=true;btn.style.outline="";
+    resultEl.textContent=mode==="nombre-sonido"?"❌ Ese no es el canto — seguí escuchando":"❌ Incorrecto, seguí intentando";
+  }
+}
+
+// ══════════════════════════════════════════
+//  END GAME
+// ══════════════════════════════════════════
+function endGame(){
+  stopTimer();
+  const total=queue.length;
+  const records=getRecords();
+  const modeKey=`${currentMode}_${currentDb}`;
+  if(!records[modeKey])records[modeKey]={};
+  const prevScore=records[modeKey].bestScore??-1;
+  const prevTime=records[modeKey].bestTime??Infinity;
+  const isNewScore=score>prevScore,isNewTime=elapsedSeconds<prevTime;
+  const newBadges=[];
+  if(isNewScore)newBadges.push("🏆 ¡Nuevo récord de aciertos!");
+  if(isNewTime)newBadges.push("⚡ ¡Nuevo récord de tiempo!");
+  records[modeKey].bestScore=Math.max(score,prevScore<0?0:prevScore);
+  if(isNewTime)records[modeKey].bestTime=elapsedSeconds;
+  saveRecords(records);
+  const scorePct=Math.round(score/total*100);
+  const newlyUnlocked=checkUnlocks(modeKey,scorePct);
+  setTimeout(()=>{if(isNewScore||isNewTime)sfx.record();else sfx.finish();},300);
+  if(newlyUnlocked.length>0)setTimeout(()=>sfx.unlock(),900);
+  const modeNames={"imagen":"Por Imagen — Opciones","imagen-libre":"Por Imagen — Escribir","nombre":"Por Nombre — Imagen","nombre-sonido":"Por Nombre — Sonido","sonido":"Por Sonido — Opciones","sonido-libre":"Por Sonido — Escribir","aleatorio-opc":"Aleatorio Con Opciones","aleatorio-libre":"Aleatorio Sin Opciones"};
+  const dbBadge=currentDb==="facil"?"🟢 Fácil":currentDb==="medio"?"🔵 Medio":currentDb==="dificil"?"🔴 Difícil":"🟣 Experto";
+  document.getElementById("res-subtitle").textContent=`${modeNames[currentMode]||currentMode} · ${dbBadge}`;
+  document.getElementById("res-score").textContent=score;
+  document.getElementById("res-score-sub").textContent=`de ${total}`;
+  document.getElementById("res-time").textContent=formatTime(elapsedSeconds);
+  const wrap=document.getElementById("records-wrap");wrap.innerHTML="";
+  newlyUnlocked.forEach(({label})=>{const d=document.createElement("div");d.className="unlock-notif";d.textContent=`🔓 ¡Nuevo desbloqueado: ${label}!`;wrap.appendChild(d);});
+  newBadges.forEach(msg=>{const d=document.createElement("div");d.className="badge-record";d.textContent=msg;wrap.appendChild(d);});
+  const bt=records[modeKey].bestTime??null;
+  document.getElementById("best-scores-display").innerHTML=`Mejor puntaje: <span>${records[modeKey].bestScore} / ${total}</span>`+(bt!==null?`&nbsp;&nbsp;|&nbsp;&nbsp; Mejor tiempo: <span>${formatTime(bt)}</span>`:"");
+  document.getElementById("play-again").onclick=()=>{sfx.click();startGame(currentMode,currentDb);};
+  showScreen("results-screen");
+}
+
+// ══════════════════════════════════════════
+//  MINIGAMES
+// ══════════════════════════════════════════
+function openMinigames(){duckMusic();showScreen("minigames-screen");}
+
+let currentMiniGame="memo",currentMiniDb="facil";
+
+function launchMiniGame(game,db){
+  currentMiniGame=game;currentMiniDb=db;
+  if(game==="memo") startMemotest();
+  else if(game==="ordenar") startOrdenar();
+  else startImpostor();
+}
+
+const DB_BADGE={facil:"🟢 Fácil",medio:"🔵 Medio",dificil:"🔴 Difícil",experto:"🟣 Experto"};
+
+// ── MEMOTEST ──
+let memoFlipped=[],memoMatched=0,memoMoves=0,memoBusy=false,memoCards=[];
+const MEMO_COUNT=6;
+
+function startMemotest(){
+  document.getElementById("memo-result").style.display="none";
+  memoFlipped=[];memoMatched=0;memoMoves=0;memoBusy=false;
+  document.getElementById("memo-moves").textContent="0";
+  document.getElementById("memo-pairs").textContent="0";
+  const badge=document.getElementById("memo-level-badge");
+  if(badge) badge.textContent=DB_BADGE[currentMiniDb]||"";
+
+  const pool=databases[currentMiniDb]||databases.facil;
+  const birds=shuffle(pool).slice(0,MEMO_COUNT);
+  document.getElementById("memo-total").textContent=MEMO_COUNT;
+
+  const cards=[
+    ...birds.map((b,i)=>({id:i,type:"image",bird:b})),
+    ...birds.map((b,i)=>({id:i,type:"name",bird:b})),
+  ];
+  const shuffled=shuffle(cards);
+  memoCards=shuffled;
+
+  const grid=document.getElementById("memo-grid");
+  grid.innerHTML="";
+  shuffled.forEach((card,idx)=>{
+    const el=document.createElement("div");
+    el.className=`memo-card${card.type==="name"?" type-name":""}`;
+    el.dataset.idx=idx;
+    el.innerHTML=`<div class="card-back">🐦</div><div class="card-front">${card.type==="image"?`<img class="card-img" src="${card.bird.image}" alt="${card.bird.name}"><div class="card-name">${card.bird.name}</div>`:`<div class="card-name" style="font-size:14px;padding:8px">${card.bird.name}</div>`}</div>`;
+    el.addEventListener("click",()=>memoClick(el,idx));
+    grid.appendChild(el);
+  });
+  showScreen("memo-screen");
+}
+
+function memoClick(el,idx){
+  if(memoBusy)return;
+  if(el.classList.contains("flipped")||el.classList.contains("matched"))return;
+  if(memoFlipped.length>=2)return;
+  el.classList.add("flipped");
+  memoFlipped.push({el,idx});
+  if(memoFlipped.length===2){
+    memoMoves++;document.getElementById("memo-moves").textContent=memoMoves;
+    const [a,b]=memoFlipped;
+    const cardA=memoCards[a.idx],cardB=memoCards[b.idx];
+    if(cardA.id===cardB.id&&cardA.type!==cardB.type){
+      // Match!
+      sfx.memo();
+      setTimeout(()=>{
+        const src=getSoundFile(cardA.bird.image);
+        playAudioSrc(src,null);
+      },300);
+      a.el.classList.add("matched");b.el.classList.add("matched");
+      memoMatched++;document.getElementById("memo-pairs").textContent=memoMatched;
+      memoFlipped=[];
+      if(memoMatched===MEMO_COUNT){
+        setTimeout(()=>{sfx.record();document.getElementById("memo-final-moves").textContent=memoMoves;document.getElementById("memo-result").style.display="block";},600);
+      }
+    } else {
+      memoBusy=true;
+      setTimeout(()=>{a.el.classList.remove("flipped");b.el.classList.remove("flipped");memoFlipped=[];memoBusy=false;},900);
+    }
+  }
+}
+
+// ── ORDENAR ──
+let ordenarBirds=[],ordenarAssigned={},ordenarDragging=null;
+
+function startOrdenar(){
+  document.getElementById("ordenar-done").style.display="none";
+  document.getElementById("ordenar-result").textContent="";
+  const badge=document.getElementById("ordenar-level-badge");
+  if(badge) badge.textContent=DB_BADGE[currentMiniDb]||"";
+  const pool=databases[currentMiniDb]||databases.facil;
+  ordenarBirds=shuffle(pool).slice(0,4);
+  ordenarAssigned={};
+
+  const grid=document.getElementById("ordenar-grid");
+  grid.innerHTML="";
+  shuffle(ordenarBirds).forEach((bird,pos)=>{
+    const cell=document.createElement("div");
+    cell.className="ordenar-img-cell";
+    cell.innerHTML=`<img src="${bird.image}" alt="${bird.name}"><div class="ordenar-drop-zone" data-bird="${bird.name}">Soltá aquí</div>`;
+    const dz=cell.querySelector(".ordenar-drop-zone");
+    dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag-over");});
+    dz.addEventListener("dragleave",()=>dz.classList.remove("drag-over"));
+    dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("drag-over");handleOrdenarDrop(dz,bird.name);});
+    grid.appendChild(cell);
+  });
+
+  const namesDiv=document.getElementById("ordenar-names");
+  namesDiv.innerHTML="";
+  shuffle(ordenarBirds).forEach(bird=>{
+    const chip=document.createElement("div");
+    chip.className="name-chip";chip.draggable=true;chip.textContent=bird.name;chip.dataset.name=bird.name;
+    chip.addEventListener("dragstart",()=>{ordenarDragging=bird.name;chip.classList.add("dragging");});
+    chip.addEventListener("dragend",()=>chip.classList.remove("dragging"));
+    // Touch support
+    chip.addEventListener("touchstart",e=>{ordenarDragging=bird.name;},{ passive:true});
+    namesDiv.appendChild(chip);
+  });
+  showScreen("ordenar-screen");
+}
+
+function handleOrdenarDrop(dz,birdName){
+  if(!ordenarDragging)return;
+  // Check if drop zone already has something
+  const prevName=dz.dataset.placed;
+  if(prevName){
+    // Return it to names bar
+    const namesDiv=document.getElementById("ordenar-names");
+    const old=namesDiv.querySelector(`[data-name="${prevName}"]`);
+    if(old)old.classList.remove("placed");
+    delete ordenarAssigned[prevName];
+  }
+  // Place new chip
+  const chip=document.querySelector(`.name-chip[data-name="${ordenarDragging}"]`);
+  if(chip)chip.classList.add("placed");
+  dz.textContent=ordenarDragging;
+  dz.dataset.placed=ordenarDragging;
+  ordenarAssigned[birdName]=ordenarDragging;
+  ordenarDragging=null;
+  const isMatch=birdName===dz.dataset.placed;
+  dz.classList.toggle("correct",isMatch);dz.classList.toggle("wrong",!isMatch);
+  checkOrdenarComplete();
+}
+
+function checkOrdenarComplete(){
+  const dbs=document.querySelectorAll(".ordenar-drop-zone");
+  let allCorrect=true,allFilled=true;
+  dbs.forEach(dz=>{
+    if(!dz.dataset.placed)allFilled=false;
+    if(dz.dataset.bird!==dz.dataset.placed)allCorrect=false;
+  });
+  const res=document.getElementById("ordenar-result");
+  if(allFilled&&allCorrect){sfx.correct();res.textContent="";document.getElementById("ordenar-done").style.display="block";}
+  else if(allFilled){sfx.wrong();res.textContent="❌ Hay errores — seguí intentando";}
+  else res.textContent="";
+}
+
+// ── IMPOSTOR ──
+let impScore=0,impRound=0,impAnswered=false;
+const IMP_ROUNDS=10;
+
+function startImpostor(){
+  impScore=0;impRound=0;
+  document.getElementById("imp-done").style.display="none";
+  document.getElementById("imp-score").textContent="0";
+  document.getElementById("imp-round").textContent="1";
+  const badge=document.getElementById("impostor-level-badge");
+  if(badge) badge.textContent=DB_BADGE[currentMiniDb]||"";
+  nextImpostorRound();
+  showScreen("impostor-screen");
+}
+
+function nextImpostorRound(){
+  impRound++;
+  if(impRound>IMP_ROUNDS){
+    document.getElementById("imp-final").textContent=impScore;
+    document.getElementById("imp-done").style.display="block";
+    return;
+  }
+  impAnswered=false;
+  document.getElementById("imp-round").textContent=impRound;
+  document.getElementById("impostor-result").textContent="";
+
+  const pool=databases[currentMiniDb]||databases.facil;
+  const birds=shuffle(pool).slice(0,4);
+  const impostorBird=shuffle(pool.filter(b=>!birds.some(x=>x.name===b.name)))[0]
+    ||shuffle(allBirds.filter(b=>!birds.some(x=>x.name===b.name)))[0];
+  const impostorIdx=Math.floor(Math.random()*4);
+  const names=birds.map(b=>b.name);
+  names[impostorIdx]=impostorBird.name;
+  const shuffledNames=shuffle(names);
+
+  // Render birds
+  const grid=document.getElementById("impostor-grid");grid.innerHTML="";
+  birds.forEach(bird=>{
+    const cell=document.createElement("div");cell.className="impostor-bird-cell";
+    cell.innerHTML=`<img src="${bird.image}" alt="${bird.name}" loading="lazy">`;
+    grid.appendChild(cell);
+  });
+
+  // Render name buttons
+  const namesDiv=document.getElementById("impostor-names");namesDiv.innerHTML="";
+  shuffledNames.forEach(name=>{
+    const isImpostor=!birds.some(b=>b.name===name);
+    const btn=document.createElement("button");btn.className="impostor-name-btn";btn.textContent=name;
+    btn.onclick=()=>{
+      if(impAnswered)return;
+      impAnswered=true;
+      document.querySelectorAll(".impostor-name-btn").forEach(b=>b.disabled=true);
+      if(isImpostor){
+        impScore++;sfx.correct();btn.classList.add("correct");
+        document.getElementById("imp-score").textContent=impScore;
+        document.getElementById("impostor-result").textContent="✅ ¡Correcto! Ese nombre no correspondía a ningún ave.";
+        document.getElementById("impostor-result").style.color="#2e7d32";
+      } else {
+        sfx.wrong();btn.classList.add("wrong");
+        document.getElementById("impostor-result").textContent=`❌ El nombre impostor era: "${impostorBird.name}"`;
+        document.getElementById("impostor-result").style.color="#c62828";
+        // Highlight correct answer
+        document.querySelectorAll(".impostor-name-btn").forEach(b=>{if(b.textContent===impostorBird.name)b.classList.add("correct");});
+      }
+      setTimeout(nextImpostorRound,2200);
+    };
+    namesDiv.appendChild(btn);
+  });
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+renderMenu();
+// Start music on first user interaction (browser autoplay policy)
+document.body.addEventListener("click",function onFirst(){
+  startMenuMusic();
+  document.body.removeEventListener("click",onFirst);
+},{once:true});
+// Also close volume panel when clicking outside it
+document.addEventListener("click",function(e){
+  const panel=document.getElementById("volume-panel");
+  const fab=document.getElementById("music-fab");
+  if(panel&&panel.classList.contains("open")&&!panel.contains(e.target)&&e.target!==fab){
+    panel.classList.remove("open");
+  }
+});
+</script>
+</body>
+</html>
