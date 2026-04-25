@@ -5,6 +5,7 @@ import { allBirds, databases } from "@/lib/data";
 import {
   checkUnlocks,
   countStars,
+  getDefaultUnlocked,
   getModeTitle,
   getOverallPct,
   getRankLabel,
@@ -65,7 +66,8 @@ export function BirdGameApp() {
   const [recordsOpen, setRecordsOpen] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
   const [guideFilter, setGuideFilter] = useState("todos");
-  const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
+  const [storageReady, setStorageReady] = useState(false);
+  const [unlocked, setUnlocked] = useState<Set<string>>(() => getDefaultUnlocked());
   const [records, setRecords] = useState<RecordsMap>({});
   const [audioSettings, setAudioSettings] = useState<AudioSettings>(DEFAULT_AUDIO_SETTINGS);
   const [resultState, setResultState] = useState<ResultState | null>(null);
@@ -108,11 +110,13 @@ export function BirdGameApp() {
     setUnlocked(loadUnlocked());
     setRecords(loadRecords());
     setAudioSettings(loadAudioSettings());
+    setStorageReady(true);
   }, []);
 
   useEffect(() => {
+    if (!storageReady) return;
     saveAudioSettings(audioSettings);
-  }, [audioSettings]);
+  }, [audioSettings, storageReady]);
 
   useEffect(() => {
     if (screen !== "game") return;
